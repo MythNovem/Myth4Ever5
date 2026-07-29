@@ -1,0 +1,39 @@
+# .NET & C# Build Outputs
+bin/
+obj/
+out/
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.user
+*.userhost
+*.userlibraries
+*.cache
+*.pfx
+
+# User specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & Operating System Files
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Frontend Node / Temp Files (if any in future)
+node_modules/
+dist/
+.env
+.env.local

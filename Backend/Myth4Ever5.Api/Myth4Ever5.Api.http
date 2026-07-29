@@ -1,0 +1,6 @@
+@Myth4Ever5.Api_HostAddress = http://localhost:5041
+
+GET {{Myth4Ever5.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
