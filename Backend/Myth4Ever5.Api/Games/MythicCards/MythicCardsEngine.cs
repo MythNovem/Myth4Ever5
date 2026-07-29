@@ -9,8 +9,8 @@ public class MythicCardsEngine : IGameEngine
 {
     public string GameTypeId => "mythic_cards";
     public string GameName => "Mythic Cards: Trap & Survive";
-    public int MinPlayers => 3;
-    public int MaxPlayers => 3;
+    public int MinPlayers => 2;
+    public int MaxPlayers => 4;
 
     private readonly Random _random = new();
 

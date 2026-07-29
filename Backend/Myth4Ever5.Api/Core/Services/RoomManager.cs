@@ -46,9 +46,9 @@ public class RoomManager
             return (false, "Phòng này đã bắt đầu game!", null);
         }
 
-        if (room.Players.Count >= 3)
+        if (room.Players.Count >= 4)
         {
-            return (false, "Phòng đã đầy (tối đa 3 người)!", null);
+            return (false, "Phòng đã đầy (tối đa 4 người)!", null);
         }
 
         var existingPlayer = room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);

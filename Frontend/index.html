@@ -3,117 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Myth4Ever5 — Web Game Party Real-time</title>
+    <meta name="description" content="Myth4Ever5 — Nền tảng web game party chơi cùng bạn bè thời gian thực">
+    <title>Myth4Ever5 — Party Game Lounge</title>
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/mythic-cards.css">
 </head>
 <body>
 
-    <!-- Header -->
+    <!-- ===== HEADER ===== -->
     <header class="app-header">
         <div class="logo-brand">
-            <span>🎮</span> MYTH4EVER5 <span style="font-size: 14px; font-weight: 400; color: #94a3b8;">Party Lounge</span>
+            <div class="logo-glyph">♟</div>
+            <span class="logo-name">MYTH4EVER5</span>
+            <span class="logo-sub">Party Lounge</span>
         </div>
-        <div id="connection-status" style="font-size: 13px; color: #10b981; display: flex; align-items: center; gap: 6px;">
-            <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span> Online
-        </div>
+        <div class="status-dot" id="connection-status">Đang kết nối...</div>
     </header>
 
-    <!-- Main Content Area -->
-    <main style="flex: 1; display: flex; flex-direction: column;">
-        
-        <!-- View 1: Lobby View (Tạo & Join Phòng) -->
-        <section id="lobby-view" class="screen active" style="justify-content: center; align-items: center; padding: 32px;">
-            <div class="lobby-box glass-panel">
-                <h2 style="text-align: center; margin-bottom: 8px; font-size: 28px;">Chào Mừng Đến Party Lounge</h2>
-                <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px; font-size: 14px;">Chọn Avatar & nhập Tên để bắt đầu tạo phòng chơi cùng bạn bè!</p>
+    <!-- ===== MAIN ===== -->
+    <main style="flex:1; display:flex; flex-direction:column;">
 
-                <!-- Avatar Picker -->
-                <label style="font-size: 14px; font-weight: 600; color: #cbd5e1;">Chọn Avatar Đại Diện:</label>
-                <div class="avatar-grid">
-                    <div class="avatar-option active">🧙‍♂️</div>
-                    <div class="avatar-option">🥷</div>
-                    <div class="avatar-option">🦸‍♀️</div>
-                    <div class="avatar-option">🤖</div>
-                    <div class="avatar-option">🦊</div>
-                    <div class="avatar-option">🐲</div>
-                    <div class="avatar-option">🦄</div>
-                    <div class="avatar-option">👑</div>
-                </div>
+        <!-- VIEW 1: Lobby — Create / Join Room -->
+        <section id="lobby-view" class="screen active"
+                 style="justify-content:center; align-items:center; padding:32px;">
 
-                <!-- Name Input -->
-                <div style="margin-bottom: 20px;">
-                    <label style="font-size: 14px; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">Tên Người Chơi:</label>
-                    <input type="text" id="player-name-input" class="input-field" placeholder="Nhập tên của bạn (e.g. Hiệp Sĩ Mèo)" maxlength="16">
-                </div>
+            <div class="panel lobby-wrap">
+                <h2 style="margin-bottom:4px;">Chào Mừng</h2>
+                <p>Chọn avatar, nhập tên rồi tạo hoặc tham gia phòng chơi.</p>
 
-                <!-- Create / Join Buttons -->
-                <button id="btn-create-room" class="btn-primary" style="margin-bottom: 16px;">➕ TẠO PHÒNG CHƠI MỚI</button>
-
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                    <div style="flex: 1; height: 1px; background: var(--border-glass);"></div>
-                    <span style="font-size: 12px; color: var(--text-muted);">HOẶC</span>
-                    <div style="flex: 1; height: 1px; background: var(--border-glass);"></div>
-                </div>
-
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="room-code-input" class="input-field" placeholder="Mã Phòng (e.g. PRT88)" style="text-transform: uppercase;">
-                    <button id="btn-join-room" class="btn-secondary" style="white-space: nowrap;">Vào Phòng</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- View 2: Room Lobby View (Sảnh Phòng Chơi) -->
-        <section id="room-view" class="screen" style="flex-direction: column; align-items: center; padding: 32px;">
-            <div class="glass-panel" style="width: 100%; max-width: 600px; padding: 32px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-glass);">
-                    <div>
-                        <div style="font-size: 13px; color: var(--text-muted);">MÃ PHÒNG CHƠI</div>
-                        <div style="font-size: 32px; font-weight: 800; color: #38bdf8; letter-spacing: 2px;" id="display-room-code">------</div>
+                <!-- Avatar -->
+                <div class="field-group" style="margin-bottom:16px;">
+                    <span class="field-label">Avatar</span>
+                    <div class="avatar-grid">
+                        <div class="avatar-option active" title="Pháp Sư">🧙‍♂️</div>
+                        <div class="avatar-option" title="Ninja">🥷</div>
+                        <div class="avatar-option" title="Nữ Anh Hùng">🦸‍♀️</div>
+                        <div class="avatar-option" title="Máy">🤖</div>
+                        <div class="avatar-option" title="Hồ Li">🦊</div>
+                        <div class="avatar-option" title="Rồng">🐲</div>
+                        <div class="avatar-option" title="Kỳ Lân">🦄</div>
+                        <div class="avatar-option" title="Vương">👑</div>
                     </div>
-                    <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('display-room-code').innerText); window.lobbyManager.showToast('Đã sao chép mã phòng!', 'success');">📋 Sao Chép Mã</button>
                 </div>
 
-                <h3 style="margin-bottom: 16px; font-size: 18px;">Danh Sách Người Chơi Trong Phòng (3 Người):</h3>
-                <div id="room-player-list" style="margin-bottom: 24px;"></div>
+                <!-- Name -->
+                <div class="field-group">
+                    <label class="field-label" for="player-name-input">Tên Người Chơi</label>
+                    <input type="text" id="player-name-input" class="input-field"
+                           placeholder="VD: Hắc Long" maxlength="16" autocomplete="off">
+                </div>
 
-                <button id="btn-start-game" class="btn-primary" style="font-size: 18px; padding: 16px;">🎮 BẮT ĐẦU GAME NGAY!</button>
+                <!-- Create -->
+                <button id="btn-create-room" class="btn btn-primary" style="margin-bottom:12px;">
+                    Tạo Phòng Mới
+                </button>
+
+                <div class="divider">hoặc tham gia</div>
+
+                <!-- Join -->
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="room-code-input" class="input-field"
+                           placeholder="Mã phòng (VD: AB3XY7)"
+                           style="text-transform:uppercase; letter-spacing:0.1em; flex:1;">
+                    <button id="btn-join-room" class="btn btn-ghost" style="flex-shrink:0;">
+                        Vào Phòng
+                    </button>
+                </div>
             </div>
         </section>
 
-        <!-- View 3: Game Container (Hiển thị Game Bài hoặc các Minigames) -->
-        <section id="game-container" class="screen" style="flex-direction: column;"></section>
+        <!-- VIEW 2: Room Lobby — Waiting for players -->
+        <section id="room-view" class="screen"
+                 style="flex-direction:column; align-items:center; padding:32px;">
+
+            <div class="panel" style="width:100%; max-width:520px; padding:28px;">
+
+                <!-- Room code -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border-dim);">
+                    <div>
+                        <div class="caption" style="margin-bottom:4px;">Mã Phòng Chơi</div>
+                        <div class="room-code-display" id="display-room-code">——————</div>
+                    </div>
+                    <button class="btn btn-ghost" id="btn-copy-code">
+                        Sao Chép
+                    </button>
+                </div>
+
+                <!-- Players -->
+                <div class="caption" style="margin-bottom:12px;">
+                    Người Chơi Trong Phòng
+                </div>
+                <div id="room-player-list" style="margin-bottom:24px;"></div>
+
+                <!-- Start -->
+                <button id="btn-start-game" class="btn btn-primary" style="font-size:15px; padding:14px;">
+                    Bắt Đầu Game
+                </button>
+            </div>
+        </section>
+
+        <!-- VIEW 3: Game Container -->
+        <section id="game-container" class="screen" style="flex-direction:column;"></section>
 
     </main>
 
-    <!-- Bottom Social Chat & Emoji Reaction Bar -->
-    <footer class="glass-panel" style="margin: 12px 24px; padding: 12px 20px; display: flex; align-items: center; gap: 16px; border-radius: 16px;">
-        <!-- Emoji Reactions -->
-        <div style="display: flex; gap: 8px;">
-            <button class="emoji-btn btn-secondary" data-emoji="💣" style="padding: 6px 10px;">💣</button>
-            <button class="emoji-btn btn-secondary" data-emoji="🛡️" style="padding: 6px 10px;">🛡️</button>
-            <button class="emoji-btn btn-secondary" data-emoji="😂" style="padding: 6px 10px;">😂</button>
-            <button class="emoji-btn btn-secondary" data-emoji="❤️" style="padding: 6px 10px;">❤️</button>
-            <button class="emoji-btn btn-secondary" data-emoji="🚀" style="padding: 6px 10px;">🚀</button>
+    <!-- ===== CHAT BAR (footer) ===== -->
+    <footer class="chat-bar">
+        <!-- Emoji Strip -->
+        <div class="emoji-strip">
+            <button class="emoji-btn" data-emoji="💣" title="Bẫy">💣</button>
+            <button class="emoji-btn" data-emoji="🛡️" title="Gỡ bẫy">🛡️</button>
+            <button class="emoji-btn" data-emoji="😂" title="Cười">😂</button>
+            <button class="emoji-btn" data-emoji="💀" title="GG">💀</button>
+            <button class="emoji-btn" data-emoji="🔥" title="Cháy">🔥</button>
         </div>
 
         <!-- Chat Input -->
-        <div style="flex: 1; display: flex; gap: 8px;">
-            <input type="text" id="chat-input" class="input-field" placeholder="Gõ tin nhắn trò chuyện với phòng..." style="padding: 10px 14px; font-size: 14px;">
-            <button id="btn-send-chat" class="btn-primary" style="width: auto; padding: 10px 20px;">Gửi</button>
+        <div class="chat-input-wrap">
+            <input type="text" id="chat-input" class="input-field"
+                   placeholder="Nhắn gì đó với cả phòng..."
+                   style="font-size:13px;">
+            <button class="chat-send-btn" id="btn-send-chat">Gửi</button>
         </div>
     </footer>
 
-    <!-- Chat Messages Drawer -->
-    <div class="glass-panel" style="position: fixed; bottom: 80px; right: 24px; width: 300px; height: 180px; padding: 12px; display: flex; flex-direction: column; z-index: 100;">
-        <div style="font-weight: 700; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">💬 Chat Phòng Realtime</div>
-        <div id="chat-messages" style="flex: 1; overflow-y: auto;"></div>
+    <!-- Chat Messages Floating Panel -->
+    <div class="panel chat-panel" id="chat-panel">
+        <div class="chat-panel-label">💬 Chat Phòng</div>
+        <div class="chat-messages" id="chat-messages"></div>
     </div>
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Scripts -->
+    <!-- ===== SCRIPTS ===== -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script src="js/core/signalr-service.js"></script>
     <script src="js/core/lobby-manager.js"></script>
@@ -122,19 +145,32 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            // Kết nối tới C# ASP.NET Core SignalR Server
+            // Copy room code button
+            document.getElementById('btn-copy-code')?.addEventListener('click', () => {
+                const code = document.getElementById('display-room-code').innerText;
+                navigator.clipboard.writeText(code);
+                window.lobbyManager.showToast('Đã sao chép mã phòng!', 'success');
+            });
+
+            // Kết nối SignalR C# Backend
             const connected = await window.signalRService.init('http://localhost:5000/hubs/party');
+            const statusEl = document.getElementById('connection-status');
+
             if (connected) {
-                // Đăng ký lắng nghe các sự kiện Server
-                window.signalRService.on('RoomStateUpdated', (room) => window.lobbyManager.renderRoomState(room));
-                window.signalRService.on('GameStarted', (gameTypeId, data) => window.gameLoader.loadGame(gameTypeId, data));
+                statusEl.textContent = 'Online';
+                statusEl.style.color = 'var(--emerald-bright)';
+
+                window.signalRService.on('RoomStateUpdated',    (room) => window.lobbyManager.renderRoomState(room));
+                window.signalRService.on('GameStarted',         (gameTypeId, data) => window.gameLoader.loadGame(gameTypeId, data));
                 window.signalRService.on('GameActionBroadcast', (actionType, data) => window.gameLoader.handleAction(actionType, data));
-                window.signalRService.on('GameOver', (winnerId, winnerName, summary) => window.gameLoader.handleGameOver(winnerId, winnerName, summary));
-                window.signalRService.on('ReceiveChatMessage', (sId, sName, sAvatar, msg, time) => window.lobbyManager.appendChatMessage(sName, sAvatar, msg, time));
-                window.signalRService.on('ReceiveEmojiReaction', (sId, sName, emoji) => window.lobbyManager.spawnFloatingEmoji(emoji, sName));
-                window.signalRService.on('ErrorNotification', (errMsg) => window.lobbyManager.showToast(errMsg, 'danger'));
+                window.signalRService.on('GameOver',            (wId, wName, sum) => window.gameLoader.handleGameOver(wId, wName, sum));
+                window.signalRService.on('ReceiveChatMessage',  (sId, sName, sAv, msg, time) => window.lobbyManager.appendChatMessage(sName, sAv, msg, time));
+                window.signalRService.on('ReceiveEmojiReaction',(sId, sName, emoji) => window.lobbyManager.spawnFloatingEmoji(emoji, sName));
+                window.signalRService.on('ErrorNotification',   (err) => window.lobbyManager.showToast(err, 'danger'));
             } else {
-                window.lobbyManager.showToast('Không thể kết nối đến Backend Server C#! Vui lòng kiểm tra lại.', 'danger');
+                statusEl.textContent = 'Offline — Không kết nối được Server';
+                statusEl.style.color = 'var(--crimson-bright)';
+                window.lobbyManager.showToast('Không thể kết nối Server C#. Kiểm tra dotnet run.', 'danger');
             }
         });
     </script>

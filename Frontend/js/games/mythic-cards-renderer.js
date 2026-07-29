@@ -6,47 +6,45 @@ class MythicCardsRenderer {
 
     init(initialData) {
         this.container = document.getElementById('game-container');
+        this.container.style.display = 'flex';
         this.renderTableSkeleton();
         this.updateState(initialData);
-
-        // Đăng ký với GameLoader
         window.gameLoader.registerRenderer('mythic_cards', this);
     }
 
     renderTableSkeleton() {
         this.container.innerHTML = `
-            <div class="card-table" id="card-table">
-                <!-- 3 vị trí người chơi -->
-                <div class="player-slot top-left" id="seat-top-left"></div>
-                <div class="player-slot top-right" id="seat-top-right"></div>
-                <div class="player-slot bottom-center" id="seat-bottom-center"></div>
+            <div class="card-table-wrap">
+                <div class="card-table" id="card-table">
+                    <div class="player-seat seat-top-left" id="seat-top-left"></div>
+                    <div class="player-seat seat-top-right" id="seat-top-right"></div>
+                    <div class="player-seat seat-bottom-me" id="seat-bottom-me"></div>
 
-                <!-- Trung tâm bàn bài -->
-                <div class="table-center">
-                    <div class="deck-pile" id="deck-pile">
-                        <span style="font-size: 32px;">🎴</span>
-                        <div class="pile-count" id="deck-count">0</div>
-                        <div class="pile-label">Bấm để Rút</div>
-                    </div>
-                    <div class="discard-pile" id="discard-pile">
-                        <span style="font-size: 32px;" id="discard-top-icon">🗑️</span>
-                        <div class="pile-count" id="discard-count">0</div>
-                        <div class="pile-label">Đã đánh</div>
+                    <div class="table-center">
+                        <div class="pile deck-pile" id="deck-pile">
+                            <div class="deck-icon">🎴</div>
+                            <div class="deck-count" id="deck-count">—</div>
+                            <span class="pile-label">Bấm để rút</span>
+                        </div>
+                        <div class="pile discard-pile" id="discard-pile">
+                            <div class="discard-top" id="discard-top-icon">✦</div>
+                            <div class="discard-count" id="discard-count">0 lá</div>
+                            <span class="pile-label">Đã đánh</span>
+                        </div>
                     </div>
                 </div>
+
+                <div class="game-log-bar" id="game-logs-box"></div>
             </div>
 
-            <!-- Bàn tay người chơi (Hand) -->
-            <div class="hand-container" id="my-hand-container"></div>
+            <div class="hand-area" id="hand-area">
+                <span class="hand-label">Bài trên tay</span>
+                <div class="hand-cards" id="my-hand-container"></div>
+            </div>
 
-            <!-- Game Logs -->
-            <div class="glass-panel" style="max-width: 800px; margin: 16px auto; padding: 12px; height: 100px; overflow-y: auto;" id="game-logs-box"></div>
-
-            <!-- Modal Container -->
             <div id="card-modal-container"></div>
         `;
 
-        // Gán event bấm vào Bộ bài để rút bài
         document.getElementById('deck-pile')?.addEventListener('click', () => {
             if (!this.gameState) return;
             const myId = window.signalRService.getConnectionId();
@@ -59,9 +57,7 @@ class MythicCardsRenderer {
     }
 
     handleAction(actionType, data) {
-        if (data.roomState) {
-            this.updateState(data.roomState);
-        }
+        if (data.roomState) this.updateState(data.roomState);
 
         if (actionType === 'card_played' && data.extraData?.futureCards) {
             this.showFutureModal(data.extraData.futureCards);
@@ -75,95 +71,91 @@ class MythicCardsRenderer {
         }
 
         if (actionType === 'player_exploded') {
-            document.getElementById('card-table')?.classList.add('shake-screen');
-            setTimeout(() => document.getElementById('card-table')?.classList.remove('shake-screen'), 600);
+            document.getElementById('card-table')?.classList.add('shake');
+            setTimeout(() => document.getElementById('card-table')?.classList.remove('shake'), 550);
         }
     }
 
     updateState(state) {
         this.gameState = state;
 
-        // 1. Cập nhật Deck Count & Discard Count
-        document.getElementById('deck-count').innerText = state.deckCount;
-        document.getElementById('discard-count').innerText = state.discardPile ? state.discardPile.length : 0;
-        
-        if (state.discardPile && state.discardPile.length > 0) {
-            const topDiscard = state.discardPile[state.discardPile.length - 1];
-            document.getElementById('discard-top-icon').innerText = topDiscard.icon;
+        // Deck & discard
+        const deckCountEl = document.getElementById('deck-count');
+        const discardCountEl = document.getElementById('discard-count');
+        const discardTopEl = document.getElementById('discard-top-icon');
+        if (deckCountEl) deckCountEl.textContent = state.deckCount;
+        if (discardCountEl) discardCountEl.textContent = `${state.discardPile?.length ?? 0} lá`;
+        if (discardTopEl && state.discardPile?.length > 0) {
+            discardTopEl.textContent = state.discardPile[state.discardPile.length - 1].icon;
         }
 
-        // 2. Cập nhật Vị trí 3 Người chơi trên bàn
         const room = window.lobbyManager.currentRoom;
         if (!room) return;
 
         const myId = window.signalRService.getConnectionId();
         const myIndex = room.players.findIndex(p => p.connectionId === myId);
-        
-        // Sắp xếp người chơi sao cho bản thân luôn ở seat-bottom-center
         const otherPlayers = [];
         for (let i = 1; i < room.players.length; i++) {
-            const idx = (myIndex + i) % room.players.length;
-            otherPlayers.push(room.players[idx]);
+            otherPlayers.push(room.players[(myIndex + i) % room.players.length]);
         }
 
-        // Seat Bottom Center (Bản thân)
-        const myPlayerObj = room.players[myIndex];
-        this.renderPlayerSeat('seat-bottom-center', myPlayerObj, state, true);
+        this.renderSeat('seat-bottom-me', room.players[myIndex], state, true);
+        if (otherPlayers[0]) this.renderSeat('seat-top-left', otherPlayers[0], state, false);
+        if (otherPlayers[1]) this.renderSeat('seat-top-right', otherPlayers[1], state, false);
 
-        // Seat Top Left (Đối thủ 1)
-        if (otherPlayers[0]) {
-            this.renderPlayerSeat('seat-top-left', otherPlayers[0], state, false);
-        }
-
-        // Seat Top Right (Đối thủ 2)
-        if (otherPlayers[1]) {
-            this.renderPlayerSeat('seat-top-right', otherPlayers[1], state, false);
-        }
-
-        // 3. Render Bài trên tay bản thân (My Hand)
         this.renderMyHand(state, myId);
 
-        // 4. Render Game Logs
         const logsBox = document.getElementById('game-logs-box');
         if (logsBox && state.gameLogs) {
-            logsBox.innerHTML = state.gameLogs.map(log => `<div style="font-size: 13px; color: #cbd5e1; margin-bottom: 4px;">• ${log}</div>`).join('');
+            logsBox.innerHTML = state.gameLogs
+                .map(log => `<div class="log-line">${log}</div>`)
+                .join('');
             logsBox.scrollTop = logsBox.scrollHeight;
         }
     }
 
-    renderPlayerSeat(seatId, player, state, isMe) {
-        const seatEl = document.getElementById(seatId);
-        if (!seatEl || !player) return;
+    renderSeat(seatId, player, state, isMe) {
+        const el = document.getElementById(seatId);
+        if (!el || !player) return;
 
         const isCurrentTurn = state.currentTurnPlayerId === player.connectionId;
-        const cardCount = state.playerCardCounts ? (state.playerCardCounts[player.connectionId] || 0) : 0;
+        const cardCount = state.playerCardCounts?.[player.connectionId] ?? 0;
 
-        seatEl.className = `player-slot ${seatId.replace('seat-', '')} ${isCurrentTurn ? 'active-turn' : ''} ${!player.isAlive ? 'dead' : ''}`;
-        seatEl.innerHTML = `
-            <div class="player-avatar-badge">${player.avatarUrl}</div>
-            <div class="player-name">${player.playerName} ${isMe ? '(Bạn)' : ''}</div>
-            <div class="player-card-count">${player.isAlive ? `🎴 ${cardCount} lá` : '💀 Đã loại'}</div>
-            ${isCurrentTurn ? `<div style="font-size: 11px; color: #38bdf8; font-weight: 700;">Lượt đi (${state.turnsToTake} lượt)</div>` : ''}
+        el.className = [
+            'player-seat',
+            seatId === 'seat-bottom-me' ? 'seat-bottom-me seat-me' : seatId === 'seat-top-left' ? 'seat-top-left' : 'seat-top-right',
+            isCurrentTurn ? 'is-turn' : '',
+            !player.isAlive ? 'is-dead' : ''
+        ].join(' ').trim();
+
+        el.innerHTML = `
+            <div class="seat-avatar">${player.avatarUrl}</div>
+            <div class="seat-name">${player.playerName}${isMe ? ' · Bạn' : ''}</div>
+            <div class="seat-card-count">${player.isAlive ? `${cardCount} lá` : '💀'}</div>
+            ${isCurrentTurn && state.turnsToTake > 1 ? `<div class="seat-turn-count">${state.turnsToTake} lượt</div>` : ''}
         `;
     }
 
     renderMyHand(state, myId) {
-        const handContainer = document.getElementById('my-hand-container');
-        if (!handContainer || !state.playerHands) return;
+        const container = document.getElementById('my-hand-container');
+        if (!container || !state.playerHands) return;
 
         const myHand = state.playerHands[myId] || [];
         const isMyTurn = state.currentTurnPlayerId === myId;
 
-        handContainer.innerHTML = myHand.map(card => `
-            <div class="game-card card-${card.type.toLowerCase()}" data-card-id="${card.id}" data-card-type="${card.type}">
-                <div style="font-size: 11px; font-weight: 700; color: ${card.color};">${card.name}</div>
-                <div class="card-icon">${card.icon}</div>
-                <div class="card-desc">${card.description}</div>
+        container.innerHTML = myHand.map(card => `
+            <div class="game-card card--${card.type.toLowerCase()}"
+                 data-card-id="${card.id}"
+                 data-card-type="${card.type}"
+                 title="${card.description}">
+                <span class="card-type-label">${card.type}</span>
+                <span class="card-icon">${card.icon}</span>
+                <span class="card-name">${card.name}</span>
+                <span class="card-desc">${card.description}</span>
             </div>
         `).join('');
 
-        // Thêm sự kiện click đánh bài
-        handContainer.querySelectorAll('.game-card').forEach(cardEl => {
+        container.querySelectorAll('.game-card').forEach(cardEl => {
             cardEl.addEventListener('click', () => {
                 if (!isMyTurn) {
                     window.lobbyManager.showToast('Chưa đến lượt của bạn!', 'warning');
@@ -182,49 +174,54 @@ class MythicCardsRenderer {
     }
 
     showFutureModal(top3Cards) {
-        const modalContainer = document.getElementById('card-modal-container');
-        modalContainer.innerHTML = `
-            <div class="game-modal-backdrop">
-                <div class="game-modal glass-panel">
-                    <h2 style="margin-bottom: 16px;">👁️ 3 Lá Bài Tiếp Theo</h2>
-                    <div style="display: flex; gap: 12px; justify-content: center; margin-bottom: 20px;">
-                        ${top3Cards.map((c, idx) => `
-                            <div class="game-card card-${c.type.toLowerCase()}" style="transform: none;">
-                                <div style="font-size: 11px; font-weight: 700; color: ${c.color};">Top ${idx + 1}: ${c.name}</div>
-                                <div class="card-icon">${c.icon}</div>
-                                <div class="card-desc">${c.description}</div>
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box">
+                    <div class="modal-title">👁 3 Lá Bài Tiếp Theo</div>
+                    <div class="modal-subtitle">Chỉ bạn nhìn thấy. Không ai khác biết.</div>
+                    <div class="future-cards-row">
+                        ${top3Cards.map((c, i) => `
+                            <div class="game-card card--${c.type.toLowerCase()}" style="cursor:default;">
+                                <span class="card-type-label">#${i + 1}</span>
+                                <span class="card-icon">${c.icon}</span>
+                                <span class="card-name">${c.name}</span>
                             </div>
                         `).join('')}
                     </div>
-                    <button class="btn-primary" onclick="document.getElementById('card-modal-container').innerHTML = ''">Đóng</button>
+                    <button class="btn btn-primary"
+                            onclick="document.getElementById('card-modal-container').innerHTML=''">
+                        Đóng
+                    </button>
                 </div>
             </div>
         `;
     }
 
     showDefusePlacementModal(deckCount) {
-        const modalContainer = document.getElementById('card-modal-container');
-        modalContainer.innerHTML = `
-            <div class="game-modal-backdrop">
-                <div class="game-modal glass-panel">
-                    <h2 style="color: #06b6d4; margin-bottom: 12px;">🛡️ Giấu Bài Bẫy Nổ</h2>
-                    <p style="margin-bottom: 16px; color: #94a3b8;">Chọn vị trí bạn muốn giấu lá Bẫy Nổ lại vào bộ bài (0 = Đầu bộ bài, ${deckCount} = Dưới cùng):</p>
-                    <input type="range" id="trap-slider" min="0" max="${deckCount}" value="0" style="width: 100%; margin-bottom: 12px;">
-                    <div style="font-size: 20px; font-weight: 800; margin-bottom: 20px;" id="slider-val">Vị trí: 0 (Đầu bộ bài)</div>
-                    <button class="btn-primary" id="btn-confirm-insert">Xác Nhận Giấu Bẫy</button>
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box">
+                    <div class="modal-title">🛡 Giấu Bẫy Nổ</div>
+                    <div class="modal-subtitle">
+                        Chọn vị trí để nhét lại Bẫy Nổ vào bộ bài.<br>
+                        0 = Đầu bộ bài · ${deckCount} = Dưới cùng
+                    </div>
+                    <input type="range" class="trap-slider" id="trap-slider"
+                           min="0" max="${deckCount}" value="${Math.floor(deckCount / 2)}">
+                    <div class="slider-label" id="slider-val">Vị trí: ${Math.floor(deckCount / 2)}</div>
+                    <button class="btn btn-primary" id="btn-confirm-insert">Xác Nhận</button>
                 </div>
             </div>
         `;
 
         const slider = document.getElementById('trap-slider');
-        slider?.addEventListener('input', (e) => {
-            document.getElementById('slider-val').innerText = `Vị trí: ${e.target.value} ${e.target.value == 0 ? '(Đầu bộ bài)' : ''}`;
+        slider?.addEventListener('input', e => {
+            document.getElementById('slider-val').textContent = `Vị trí: ${e.target.value}`;
         });
 
         document.getElementById('btn-confirm-insert')?.addEventListener('click', () => {
-            const idx = parseInt(slider.value);
-            window.signalRService.sendGameAction('insert_trap', { insertIndex: idx });
-            modalContainer.innerHTML = '';
+            window.signalRService.sendGameAction('insert_trap', { insertIndex: parseInt(slider.value) });
+            document.getElementById('card-modal-container').innerHTML = '';
         });
     }
 
@@ -233,32 +230,43 @@ class MythicCardsRenderer {
         const myId = window.signalRService.getConnectionId();
         const targets = room.players.filter(p => p.connectionId !== myId && p.isAlive);
 
-        const modalContainer = document.getElementById('card-modal-container');
-        modalContainer.innerHTML = `
-            <div class="game-modal-backdrop">
-                <div class="game-modal glass-panel">
-                    <h2 style="color: #f59e0b; margin-bottom: 16px;">🎁 Chọn Đối Thủ Để Cướp Bài</h2>
-                    <div style="display: flex; gap: 12px; justify-content: center; margin-bottom: 20px;">
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box">
+                    <div class="modal-title">🎁 Chọn Đối Thủ</div>
+                    <div class="modal-subtitle">Bạn sẽ cướp 1 lá bài ngẫu nhiên từ tay họ.</div>
+                    <div class="target-player-grid">
                         ${targets.map(t => `
-                            <button class="btn-secondary" onclick="window.signalRService.sendGameAction('play_card', { cardId: '${cardId}', targetPlayerId: '${t.connectionId}' }); document.getElementById('card-modal-container').innerHTML = '';">
-                                <span style="font-size: 24px;">${t.avatarUrl}</span><br>
-                                <strong>${t.playerName}</strong>
+                            <button class="target-player-btn"
+                                onclick="window.signalRService.sendGameAction('play_card',
+                                    {cardId:'${cardId}',targetPlayerId:'${t.connectionId}'});
+                                 document.getElementById('card-modal-container').innerHTML='';">
+                                <span class="avatar">${t.avatarUrl}</span>
+                                <span class="name">${t.playerName}</span>
                             </button>
                         `).join('')}
                     </div>
+                    <button class="btn btn-ghost" onclick="document.getElementById('card-modal-container').innerHTML=''">
+                        Huỷ
+                    </button>
                 </div>
             </div>
         `;
     }
 
     handleGameOver(winnerId, winnerName, summary) {
-        const modalContainer = document.getElementById('card-modal-container');
-        modalContainer.innerHTML = `
-            <div class="game-modal-backdrop">
-                <div class="game-modal glass-panel" style="border-color: #f59e0b;">
-                    <h1 style="font-size: 40px; margin-bottom: 12px;">🏆 CHIẾN THẮNG!</h1>
-                    <p style="font-size: 20px; font-weight: 700; color: #38bdf8; margin-bottom: 20px;">Người chơi [${winnerName}] là người duy nhất sống sót!</p>
-                    <button class="btn-primary" onclick="location.reload()">Về Sảnh Chờ</button>
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box gameover-modal">
+                    <div class="gameover-trophy">🏆</div>
+                    <div class="gameover-title">Chiến Thắng!</div>
+                    <div class="gameover-winner">
+                        <strong style="color:var(--lavender);">${winnerName}</strong>
+                        là người duy nhất sống sót.
+                    </div>
+                    <button class="btn btn-primary" onclick="location.reload()">
+                        Quay Về Sảnh
+                    </button>
                 </div>
             </div>
         `;

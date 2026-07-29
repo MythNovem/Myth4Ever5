@@ -83,24 +83,29 @@ class LobbyManager {
         const startBtn = document.getElementById('btn-start-game');
         if (startBtn) {
             startBtn.style.display = isHost ? 'block' : 'none';
-            startBtn.disabled = room.players.length < 3;
-            startBtn.innerText = room.players.length < 3 
-                ? `Đang chờ đủ 3 người (${room.players.length}/3)...` 
-                : '🎮 BẮT ĐẦU GAME NGAY!';
+            startBtn.disabled = room.players.length < 2;
+            startBtn.innerText = room.players.length < 2
+                ? `Đang chờ thêm người (${room.players.length}/4)...`
+                : `🎮 Bắt Đầu Game (${room.players.length} người)`;
         }
 
         // Render player list in room lobby
         const playerListContainer = document.getElementById('room-player-list');
         if (playerListContainer) {
-            playerListContainer.innerHTML = room.players.map(p => `
-                <div class="player-card glass-panel" style="padding: 12px; display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                    <span style="font-size: 28px;">${p.avatarUrl}</span>
-                    <div style="flex: 1;">
-                        <div style="font-weight: 700;">${p.playerName} ${p.isHost ? '👑 (Chủ phòng)' : ''}</div>
-                        <div style="font-size: 12px; color: #94a3b8;">${p.connectionId === myConnectionId ? '(Bạn)' : 'Sẵn sàng'}</div>
+            playerListContainer.innerHTML = room.players.map(p => {
+                const isMe = p.connectionId === myConnectionId;
+                return `
+                <div class="player-row">
+                    <div class="player-avatar">${p.avatarUrl}</div>
+                    <div class="player-info">
+                        <div class="player-name-text">${p.playerName}</div>
+                        <div class="player-badge">
+                            ${p.isHost ? '<span class="crown-badge">👑 Chủ phòng</span>' : ''}
+                            ${isMe ? '<span style="font-size:11px; color:var(--text-muted);"> · Bạn</span>' : ''}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
     }
 
@@ -109,7 +114,7 @@ class LobbyManager {
         if (!container) return;
 
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        toast.className = `toast ${type}`;
         toast.innerText = message;
         container.appendChild(toast);
 
@@ -132,8 +137,8 @@ class LobbyManager {
         if (!container) return;
 
         const msgEl = document.createElement('div');
-        msgEl.style.marginBottom = '8px';
-        msgEl.innerHTML = `<span style="font-size: 14px;">${senderAvatar} <strong>${senderName}</strong> <small style="color: #64748b;">${time}</small>: ${message}</span>`;
+        msgEl.className = 'chat-message';
+        msgEl.innerHTML = `${senderAvatar} <span class="sender">${senderName}</span><span class="time">${time}</span> ${message}`;
         container.appendChild(msgEl);
         container.scrollTop = container.scrollHeight;
     }
