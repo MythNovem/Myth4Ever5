@@ -583,7 +583,7 @@ main, header, footer, section {
 .chat-panel {
     position: fixed;
     bottom: 76px;
-    right: 20px;
+    left: 20px;
     width: 280px;
     height: 200px;
     display: flex;

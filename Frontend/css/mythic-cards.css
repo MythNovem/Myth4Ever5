@@ -282,13 +282,23 @@
 .hand-cards {
     display: flex;
     justify-content: center;
-    gap: 8px;
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding: 8px 0 4px;
+    padding: 8px 16px 4px;
     scrollbar-width: none;
     width: 100%;
     max-width: 880px;
+}
+
+.hand-cards .game-card {
+    margin-left: -35px;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.3);
+}
+.hand-cards .game-card:first-child {
+    margin-left: 0;
+}
+.hand-cards .game-card:hover, .hand-cards .game-card.selected {
+    margin-right: 20px; /* Push siblings away slightly on hover */
 }
 
 /* ============================================
@@ -297,9 +307,9 @@
 
 .game-card {
     flex-shrink: 0;
-    width: 96px;
-    height: 136px;
-    border-radius: 10px;
+    width: 80px;
+    height: 114px;
+    border-radius: 8px;
     background: var(--surface-1);
     border: 1px solid var(--border-dim);
     display: flex;
@@ -311,7 +321,8 @@
     transition:
         transform 0.2s var(--ease-out),
         border-color 0.2s,
-        box-shadow 0.2s var(--ease-out);
+        box-shadow 0.2s var(--ease-out),
+        margin 0.2s var(--ease-out);
     position: relative;
     overflow: hidden;
 }

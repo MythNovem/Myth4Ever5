@@ -15,7 +15,10 @@ class MythicCardsRenderer {
 
     renderTableSkeleton() {
         this.container.innerHTML = `
-            <div style="width: 100%; display: flex; justify-content: flex-end; padding: 10px 24px 0;">
+            <div style="width: 100%; display: flex; justify-content: flex-end; padding: 10px 24px 0; gap: 8px;">
+                <button class="btn btn-ghost" id="btn-surrender-game" style="font-size: 13px; color: var(--crimson-bright); border-color: var(--crimson);">
+                    🏳️ Chịu Thua
+                </button>
                 <button class="btn btn-ghost" id="btn-show-rules" style="font-size: 13px; color: var(--gold-bright);">
                     📜 Luật Chơi
                 </button>
@@ -53,7 +56,7 @@ class MythicCardsRenderer {
 
         document.getElementById('deck-pile')?.addEventListener('click', () => {
             if (!this.gameState) return;
-            const myId = window.signalRService.getConnectionId();
+            const myId = window.signalRService.getPlayerId();
             if (this.gameState.currentTurnPlayerId === myId) {
                 window.signalRService.sendGameAction('draw_card', {});
             } else {
@@ -63,6 +66,14 @@ class MythicCardsRenderer {
 
         document.getElementById('btn-show-rules')?.addEventListener('click', () => {
             this.showRulesModal();
+        });
+
+        document.getElementById('btn-surrender-game')?.addEventListener('click', async () => {
+            if (confirm("Bạn có chắc chắn muốn chịu thua và rời phòng?")) {
+                await window.signalRService.sendGameAction('surrender', {});
+                await window.signalRService.leaveRoomExplicit();
+                window.lobbyManager.clearRoomState();
+            }
         });
     }
 
@@ -116,7 +127,7 @@ class MythicCardsRenderer {
         if (data.roomState) this.updateState(data.roomState);
 
         if (actionType === 'card_played' && data.extraData?.futureCards) {
-            const myId = window.signalRService.getConnectionId();
+            const myId = window.signalRService.getPlayerId();
             if (data.playerId === myId) {
                 if (data.extraData.isAlter) {
                     this.showAlterFutureModal(data.extraData.futureCards);
@@ -127,7 +138,7 @@ class MythicCardsRenderer {
         }
         
         if (actionType === 'future_rearranged') {
-            const myId = window.signalRService.getConnectionId();
+            const myId = window.signalRService.getPlayerId();
             if (data.playerId === myId) {
                 window.lobbyManager.showToast('Bạn đã thay đổi tương lai thành công!', 'success');
                 document.getElementById('card-modal-container').innerHTML = '';
@@ -135,7 +146,7 @@ class MythicCardsRenderer {
         }
 
         if (actionType === 'trap_defused_need_placement') {
-            const myId = window.signalRService.getConnectionId();
+            const myId = window.signalRService.getPlayerId();
             if (data.playerId === myId) {
                 this.showDefusePlacementModal(data.deckCount);
             }
@@ -164,8 +175,8 @@ class MythicCardsRenderer {
         const room = window.lobbyManager.currentRoom;
         if (!room) return;
 
-        const myId = window.signalRService.getConnectionId();
-        const myIndex = room.players.findIndex(p => p.connectionId === myId);
+        const myId = window.signalRService.getPlayerId();
+        const myIndex = room.players.findIndex(p => p.playerId === myId);
         const otherPlayers = [];
         for (let i = 1; i < room.players.length; i++) {
             otherPlayers.push(room.players[(myIndex + i) % room.players.length]);
@@ -231,8 +242,8 @@ class MythicCardsRenderer {
     }
 
     fillSeat(el, player, state, isMe, positionClass) {
-        const isCurrentTurn = state.currentTurnPlayerId === player.connectionId;
-        const cardCount = state.playerCardCounts?.[player.connectionId] ?? 0;
+        const isCurrentTurn = state.currentTurnPlayerId === player.playerId;
+        const cardCount = state.playerCardCounts?.[player.playerId] ?? 0;
 
         el.className = [
             'player-seat',
@@ -291,7 +302,7 @@ class MythicCardsRenderer {
         } else {
             this.selectedCardIds.push(cardId);
         }
-        const myId = window.signalRService.getConnectionId();
+        const myId = window.signalRService.getPlayerId();
         this.renderMyHand(this.gameState, myId);
     }
 
@@ -306,15 +317,16 @@ class MythicCardsRenderer {
                 playBtn.id = 'btn-play-selected';
                 playBtn.className = 'btn btn-primary';
                 playBtn.style.position = 'absolute';
-                playBtn.style.bottom = '220px';
-                playBtn.style.left = '50%';
-                playBtn.style.transform = 'translateX(-50%)';
+                playBtn.style.bottom = '24px';
+                playBtn.style.right = '32px';
+                playBtn.style.width = 'auto';
                 playBtn.style.zIndex = '100';
                 playBtn.style.boxShadow = '0 0 20px rgba(123, 82, 214, 0.5)';
                 playBtn.style.padding = '12px 24px';
                 playBtn.style.fontSize = '14px';
                 playBtn.addEventListener('click', () => this.playSelectedCards());
-                document.getElementById('card-table').appendChild(playBtn);
+                document.getElementById('hand-area').style.position = 'relative';
+                document.getElementById('hand-area').appendChild(playBtn);
             }
             playBtn.innerText = `Đánh ${this.selectedCardIds.length} lá đã chọn`;
             playBtn.style.display = 'block';
@@ -326,7 +338,7 @@ class MythicCardsRenderer {
     playSelectedCards() {
         if (this.selectedCardIds.length === 0) return;
 
-        const myId = window.signalRService.getConnectionId();
+        const myId = window.signalRService.getPlayerId();
         const hand = this.gameState.playerHands[myId] || [];
         const selectedCards = this.selectedCardIds.map(id => hand.find(c => c.id === id)).filter(c => c);
 
@@ -476,8 +488,8 @@ class MythicCardsRenderer {
 
     showTargetPlayerModal(cardIds, titleText) {
         const room = window.lobbyManager.currentRoom;
-        const myId = window.signalRService.getConnectionId();
-        const targets = room.players.filter(p => p.connectionId !== myId && p.isAlive);
+        const myId = window.signalRService.getPlayerId();
+        const targets = room.players.filter(p => p.playerId !== myId && p.isAlive);
         
         let extraHtml = '';
         if (cardIds.length === 3) {
@@ -508,7 +520,7 @@ class MythicCardsRenderer {
                     ${extraHtml}
                     <div class="target-player-grid" style="margin-top: 16px;">
                         ${targets.map(t => `
-                            <button class="target-player-btn" data-target-id="${t.connectionId}">
+                            <button class="target-player-btn" data-target-id="${t.playerId}">
                                 <span class="avatar">${t.avatarUrl}</span>
                                 <span class="name">${t.playerName}</span>
                             </button>

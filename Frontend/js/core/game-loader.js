@@ -16,9 +16,9 @@ class GameLoader {
         const header = document.querySelector('.app-header');
         if (header) header.style.display = 'none';
 
-        // Ẩn Chat Panel tĩnh (chỉ giữ lại thanh chat dưới cùng)
+        // Không ẩn chat panel nữa, để người chơi có thể chat trong game
         const chatPanel = document.getElementById('chat-panel');
-        if (chatPanel) chatPanel.style.display = 'none';
+        if (chatPanel) chatPanel.style.display = 'flex';
 
         const renderer = this.renderers[gameTypeId];
         if (renderer) {

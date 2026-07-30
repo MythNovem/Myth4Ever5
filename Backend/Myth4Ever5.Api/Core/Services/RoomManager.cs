@@ -100,9 +100,16 @@ public class RoomManager
             var player = room.Players.FirstOrDefault(p => p.PlayerId == playerId);
             if (player != null)
             {
-                room.Players.Remove(player);
+                if (room.IsGameStarted)
+                {
+                    player.IsConnected = false;
+                }
+                else
+                {
+                    room.Players.Remove(player);
+                }
 
-                if (room.Players.Count == 0)
+                if (room.Players.Count(p => p.IsConnected) == 0)
                 {
                     _rooms.TryRemove(roomCode, out _);
                     return (null, player);
@@ -110,8 +117,12 @@ public class RoomManager
 
                 if (player.IsHost && room.Players.Count > 0)
                 {
-                    room.Players[0].IsHost = true;
-                    room.HostConnectionId = room.Players[0].ConnectionId;
+                    var nextHost = room.Players.FirstOrDefault(p => p.IsConnected);
+                    if (nextHost != null)
+                    {
+                        nextHost.IsHost = true;
+                        room.HostConnectionId = nextHost.ConnectionId;
+                    }
                 }
 
                 return (room, player);

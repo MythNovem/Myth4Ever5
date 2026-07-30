@@ -61,7 +61,15 @@ class LobbyManager {
 
         // Leave Room Button
         document.getElementById('btn-leave-room')?.addEventListener('click', async () => {
-            if (confirm("Bạn có chắc chắn muốn rời phòng?")) {
+            const isGameStarted = this.currentRoom && this.currentRoom.isGameStarted;
+            const confirmMsg = isGameStarted 
+                ? "Bạn có chắc chắn muốn rời phòng? Hành động này sẽ tính là chịu thua trong ván đang chơi!"
+                : "Bạn có chắc chắn muốn rời phòng?";
+                
+            if (confirm(confirmMsg)) {
+                if (isGameStarted) {
+                    await window.signalRService.sendGameAction('surrender', {});
+                }
                 await window.signalRService.leaveRoomExplicit();
                 this.clearRoomState();
             }
@@ -102,7 +110,11 @@ class LobbyManager {
         
         // Show Room view, hide Lobby view
         document.getElementById('lobby-view').style.display = 'none';
-        document.getElementById('room-view').style.display = 'block';
+        if (room.isGameStarted) {
+            document.getElementById('room-view').style.display = 'none';
+        } else {
+            document.getElementById('room-view').style.display = 'block';
+        }
 
         const myPlayerId = window.signalRService.getPlayerId();
         const isHost = room.hostConnectionId === room.players.find(p => p.playerId === myPlayerId)?.connectionId;

@@ -107,7 +107,7 @@ public class MythicCardsEngine : IGameEngine
         }
 
         var currentPlayer = room.Players[state.CurrentTurnIndex];
-        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap")
+        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap" && actionType != "surrender")
         {
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
         }
@@ -131,9 +131,37 @@ public class MythicCardsEngine : IGameEngine
             case "rearrange_future":
                 return Task.FromResult(HandleRearrangeFuture(room, state, playerId, payload));
 
+            case "surrender":
+                return Task.FromResult(HandleSurrender(room, state, playerId));
+
             default:
                 return Task.FromResult(new GameActionResult { Success = false, Message = "Hành động không hợp lệ" });
         }
+    }
+
+    private GameActionResult HandleSurrender(RoomModel room, MythicCardsState state, string playerId)
+    {
+        var victim = room.Players.First(p => p.PlayerId == playerId);
+        victim.IsAlive = false;
+
+        var victimHand = state.PlayerHands[playerId];
+        state.DiscardPile.AddRange(victimHand);
+        victimHand.Clear();
+
+        state.GameLogs.Add($"🏳️ {victim.PlayerName} đã đầu hàng và rời phòng!");
+        
+        // Nếu là lượt của người này thì chuyển qua người kế tiếp
+        if (room.Players[state.CurrentTurnIndex].PlayerId == playerId)
+        {
+            AdvanceTurn(room, state);
+        }
+        else
+        {
+            // Nếu người đầu hàng không phải người đang đi, ta có thể cần cập nhật index để trỏ đúng vào người đang đi (nếu danh sách thu hẹp lại thì khác, nhưng mảng không đổi)
+            // Tuy nhiên mảng Players không thay đổi, IsAlive = false thôi, nên CurrentTurnIndex vẫn trỏ đúng người.
+        }
+
+        return CheckGameOverOrContinue(room, state, "player_surrendered", new { surrenderedPlayerId = playerId });
     }
 
     private GameActionResult HandlePlayCard(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
@@ -647,7 +675,7 @@ public class MythicCardsEngine : IGameEngine
         {
             DeckCount = state.Deck.Count,
             DiscardPile = state.DiscardPile,
-            CurrentTurnPlayerId = room.Players[state.CurrentTurnIndex].ConnectionId,
+            CurrentTurnPlayerId = room.Players[state.CurrentTurnIndex].PlayerId,
             CurrentTurnPlayerName = room.Players[state.CurrentTurnIndex].PlayerName,
             TurnsToTake = state.TurnsToTake,
             AwaitingDefusePlacement = state.AwaitingDefusePlacement,
