@@ -84,6 +84,10 @@ class SignalRService {
         return this.connection.invoke('SelectGame', gameTypeId);
     }
 
+    async toggleReady() {
+        return this.connection.invoke('ToggleReady');
+    }
+
     async startGame() {
         return this.connection.invoke('StartGame');
     }

@@ -63,6 +63,7 @@ public class RoomManager
                 PlayerName = playerName,
                 AvatarUrl = avatarUrl,
                 IsHost = false,
+                IsReady = false,
                 IsConnected = true
             };
 

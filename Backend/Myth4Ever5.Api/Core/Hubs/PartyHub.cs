@@ -108,6 +108,18 @@ public class PartyHub : Hub<IPartyClient>
         await Clients.Group(room.RoomCode).RoomStateUpdated(room);
     }
 
+    public async Task ToggleReady()
+    {
+        var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);
+        if (room == null || room.IsGameStarted) return;
+
+        var player = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (player == null || player.IsHost) return;
+
+        player.IsReady = !player.IsReady;
+        await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+    }
+
     public async Task StartGame()
     {
         var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);
@@ -133,6 +145,14 @@ public class PartyHub : Hub<IPartyClient>
         if (room.Players.Count < engine.MinPlayers)
         {
             await Clients.Caller.ErrorNotification($"Cần tối thiểu {engine.MinPlayers} người chơi để bắt đầu game này!");
+            return;
+        }
+
+        var unready = room.Players.Where(p => !p.IsHost && !p.IsReady).ToList();
+        if (unready.Count > 0)
+        {
+            var names = string.Join(", ", unready.Select(p => p.PlayerName));
+            await Clients.Caller.ErrorNotification($"Vẫn còn người chơi chưa Sẵn sàng: {names}!");
             return;
         }
 
@@ -174,6 +194,7 @@ public class PartyHub : Hub<IPartyClient>
         if (result.IsGameOver)
         {
             room.IsGameStarted = false;
+            foreach (var p in room.Players.Where(p => !p.IsHost)) p.IsReady = false;
             await Clients.Group(room.RoomCode).GameOver(result.WinnerId ?? "", result.WinnerName ?? "Vô danh", result.Data ?? new { });
             await Clients.Group(room.RoomCode).RoomStateUpdated(room);
         }

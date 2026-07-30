@@ -45,6 +45,11 @@ class LobbyManager {
             await window.signalRService.startGame();
         });
 
+        // Toggle Ready Button (Non-host)
+        document.getElementById('btn-toggle-ready')?.addEventListener('click', async () => {
+            await window.signalRService.toggleReady();
+        });
+
         // Game Selection Change (Host)
         document.getElementById('select-game-type')?.addEventListener('change', async (e) => {
             await window.signalRService.selectGame(e.target.value);
@@ -129,7 +134,8 @@ class LobbyManager {
         }
 
         const myPlayerId = window.signalRService.getPlayerId();
-        const isHost = room.hostConnectionId === room.players.find(p => p.playerId === myPlayerId)?.connectionId;
+        const mePlayer   = room.players.find(p => p.playerId === myPlayerId);
+        const isHost     = room.hostConnectionId === mePlayer?.connectionId || mePlayer?.isHost;
 
         const gameSelect = document.getElementById('select-game-type');
         if (gameSelect) {
@@ -138,12 +144,35 @@ class LobbyManager {
         }
 
         const startBtn = document.getElementById('btn-start-game');
-        if (startBtn) {
-            startBtn.style.display = isHost ? 'block' : 'none';
-            startBtn.disabled = room.players.length < 2;
-            startBtn.innerText = room.players.length < 2
-                ? `Đang chờ thêm người (${room.players.length}/4)...`
-                : `🎮 Bắt Đầu Game (${room.players.length} người)`;
+        const readyBtn = document.getElementById('btn-toggle-ready');
+
+        const nonHostPlayers = room.players.filter(p => !p.isHost);
+        const allReady = nonHostPlayers.length > 0 && nonHostPlayers.every(p => p.isReady);
+
+        if (isHost) {
+            if (readyBtn) readyBtn.style.display = 'none';
+            if (startBtn) {
+                startBtn.style.display = 'block';
+                startBtn.disabled = room.players.length < 2 || !allReady;
+
+                if (room.players.length < 2) {
+                    startBtn.innerText = `Đang chờ thêm người (${room.players.length}/4)...`;
+                } else if (!allReady) {
+                    const unreadyCount = nonHostPlayers.filter(p => !p.isReady).length;
+                    startBtn.innerText = `⏳ Chờ người chơi Sẵn Sàng (${unreadyCount} người chưa sẵn sàng)...`;
+                } else {
+                    startBtn.innerText = `🎮 Bắt Đầu Game (${room.players.length} người)`;
+                }
+            }
+        } else {
+            if (startBtn) startBtn.style.display = 'none';
+            if (readyBtn) {
+                readyBtn.style.display = 'block';
+                const isReady = mePlayer?.isReady ?? false;
+                readyBtn.innerText = isReady ? '❌ Hủy Sẵn Sàng' : '✅ Sẵn Sàng';
+                readyBtn.style.color = isReady ? 'var(--crimson-bright)' : 'var(--emerald-bright)';
+                readyBtn.style.borderColor = isReady ? 'var(--crimson)' : 'var(--emerald)';
+            }
         }
 
         const playerListContainer = document.getElementById('room-player-list');
@@ -152,13 +181,23 @@ class LobbyManager {
                 const isMe = p.playerId === myPlayerId;
                 const offlineStyle = p.isConnected ? '' : 'opacity: 0.5; filter: grayscale(1);';
                 const offlineText = p.isConnected ? '' : ' <span style="color:var(--crimson-bright); font-size:10px;">(Offline)</span>';
+
+                let badge = '';
+                if (p.isHost) {
+                    badge = '<span class="crown-badge">👑 Chủ phòng</span>';
+                } else if (p.isReady) {
+                    badge = '<span style="color:var(--emerald-bright); font-size:11px; font-weight:bold;">✅ Sẵn sàng</span>';
+                } else {
+                    badge = '<span style="color:var(--text-muted); font-size:11px;">⏳ Chưa sẵn sàng</span>';
+                }
+
                 return `
                 <div class="player-row" style="${offlineStyle}">
                     <div class="player-avatar">${p.avatarUrl}</div>
                     <div class="player-info">
                         <div class="player-name-text">${p.playerName}${offlineText}</div>
                         <div class="player-badge">
-                            ${p.isHost ? '<span class="crown-badge">👑 Chủ phòng</span>' : ''}
+                            ${badge}
                             ${isMe ? '<span style="font-size:11px; color:var(--text-muted);"> · Bạn</span>' : ''}
                         </div>
                     </div>
