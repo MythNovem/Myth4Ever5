@@ -85,7 +85,7 @@ class MCTimerRenderer {
         const pending = state.currentPendingAction || state.CurrentPendingAction;
         const expiryStr = pending?.expiryTime || pending?.ExpiryTime;
         if (pending && expiryStr) {
-            const totalDurationMs = 5000;
+            const totalDurationMs = 10000;
             const parsedExpiry = new Date(expiryStr).getTime();
             let durationLeft = parsedExpiry - Date.now();
 

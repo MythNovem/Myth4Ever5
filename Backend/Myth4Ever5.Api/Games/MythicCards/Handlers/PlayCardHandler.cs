@@ -71,7 +71,7 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
             state.DiscardPile.Add(nopeCard);
 
             state.CurrentPendingAction.NopeCount++;
-            state.CurrentPendingAction.ExpiryTime = DateTime.UtcNow.AddSeconds(5);
+            state.CurrentPendingAction.ExpiryTime = DateTime.UtcNow.AddSeconds(10);
 
             string nopeType = state.CurrentPendingAction.NopeCount % 2 == 1 ? "🛑 CHẶN (NOPE)!" : "✅ YUP! (CHẶN LẠI CHẶN)";
             state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã ném {nopeType}");
@@ -148,7 +148,7 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
             SourcePlayerId = playerId,
             ActionType = "play_card",
             Payload = payload,
-            ExpiryTime = DateTime.UtcNow.AddSeconds(5),
+            ExpiryTime = DateTime.UtcNow.AddSeconds(10),
             NopeCount = 0,
             CardNames = cardNamesStr
         };

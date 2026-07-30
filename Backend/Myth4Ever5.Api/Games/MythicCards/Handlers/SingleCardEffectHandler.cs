@@ -98,7 +98,7 @@ public class SingleCardEffectHandler
         hand.Add(stolen);
 
         var robberName = room.Players.First(p => p.PlayerId == playerId).PlayerName;
-        state.GameLogs.Add($"🎁 {robberName} đã cướp lá {stolen.Name} {stolen.Icon} của {target.PlayerName}!");
+        state.GameLogs.Add($"🎁 {robberName} đã cướp 1 lá bài của {target.PlayerName}!");
 
         return new
         {
