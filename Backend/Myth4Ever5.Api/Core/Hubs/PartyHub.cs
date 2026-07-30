@@ -61,6 +61,11 @@ public class PartyHub : Hub<IPartyClient>
         // Cập nhật lại ConnectionId mới
         existingPlayer.ConnectionId = Context.ConnectionId;
         existingPlayer.IsConnected = true;
+        
+        if (existingPlayer.IsHost)
+        {
+            room.HostConnectionId = Context.ConnectionId;
+        }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, room.RoomCode);
         
@@ -71,7 +76,7 @@ public class PartyHub : Hub<IPartyClient>
             var engine = _engineFactory.GetEngine(room.SelectedGameTypeId);
             if (engine != null)
             {
-                var sanitizedState = engine.SanitizeStateForBroadcast(room, room.GameState);
+                var sanitizedState = engine.SanitizeStateForBroadcast(room, room.GameState!);
                 await Clients.Caller.GameStarted(engine.GameTypeId, sanitizedState);
             }
         }

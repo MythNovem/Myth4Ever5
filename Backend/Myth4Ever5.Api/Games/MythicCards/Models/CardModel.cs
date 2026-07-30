@@ -19,7 +19,9 @@ public enum CardType
     Normal5,       // Golem Đá
     AlterFuture,   // Đổi Tương Lai
     DrawBottom,    // Rút Đáy
-    TargetedAttack // Ép Lượt Chỉ Định
+    TargetedAttack,// Ép Lượt Chỉ Định
+    Nope,          // Chặn
+    Favor          // Xin Xỏ
 }
 
 public class CardModel

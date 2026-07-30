@@ -10,4 +10,27 @@ public class MythicCardsState
     public List<string> GameLogs { get; set; } = new();
     public bool AwaitingDefusePlacement { get; set; } = false;
     public string? PendingDefusePlayerId { get; set; }
+    
+    // Đếm ngược bom nổ
+    public bool IsExploding { get; set; } = false;
+    public string? ExplodingPlayerId { get; set; }
+    public DateTime? ExplodeExpiryTime { get; set; }
+
+    // Chờ Xin Xỏ
+    public bool AwaitingFavorResponse { get; set; } = false;
+    public string? PendingFavorSourceId { get; set; }
+    public string? PendingFavorTargetId { get; set; }
+
+    public PendingAction? CurrentPendingAction { get; set; }
 }
+
+public class PendingAction
+{
+    public string SourcePlayerId { get; set; } = string.Empty;
+    public string ActionType { get; set; } = string.Empty; // e.g. "play_card", "favor"
+    public System.Text.Json.JsonElement Payload { get; set; }
+    public int NopeCount { get; set; } = 0;
+    public DateTime ExpiryTime { get; set; }
+    public string TargetPlayerId { get; set; } = string.Empty; // For Favor
+}
+

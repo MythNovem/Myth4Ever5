@@ -47,6 +47,16 @@ public class MythicCardsEngine : IGameEngine
             actionCards.Add(new CardModel { Type = CardType.TargetedAttack, Name = "Ám Sát", Description = "Ép một người bất kỳ đi 2 lượt liên tiếp", Icon = "🎯", Color = "#be123c" });
         }
 
+        // Nope (Chặn) và Favor (Xin Xỏ)
+        for (int i = 0; i < 5; i++)
+        {
+            actionCards.Add(new CardModel { Type = CardType.Nope, Name = "Chặn (Nope)", Description = "Huỷ bỏ một hành động vừa diễn ra (trừ Gỡ Bẫy/Bẫy Nổ).", Icon = "🛑", Color = "#ef4444" });
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            actionCards.Add(new CardModel { Type = CardType.Favor, Name = "Xin Xỏ", Description = "Bắt 1 người chơi tự chọn và nộp cho bạn 1 lá bài.", Icon = "🙏", Color = "#fcd34d" });
+        }
+
         // Xáo trộn các lá Action để chia
         ShuffleList(actionCards);
 
@@ -80,8 +90,13 @@ public class MythicCardsEngine : IGameEngine
             remainingDeck.Add(new CardModel { Type = CardType.ExplodingTrap, Name = "Bẫy Nổ", Description = "Nổ tung và loại người chơi khỏi bàn!", Icon = "💣", Color = "#dc2626" });
         }
 
-        // Thêm 1 lá Defuse dự phòng vào bộ bài
-        remainingDeck.Add(new CardModel { Type = CardType.Defuse, Name = "Gỡ Bẫy", Description = "Cứu bạn khi rút phải Bẫy Nổ", Icon = "🛡️", Color = "#06b6d4" });
+        // Thêm lá Defuse vào nọc để tổng số Defuse trong game = 8
+        // (mỗi người đã có 1 trên tay, nọc thêm đủ để tổng = 8)
+        int extraDefuses = 8 - room.Players.Count;
+        for (int i = 0; i < extraDefuses; i++)
+        {
+            remainingDeck.Add(new CardModel { Type = CardType.Defuse, Name = "Gỡ Bẫy", Description = "Cứu bạn khi rút phải Bẫy Nổ", Icon = "🛡️", Color = "#06b6d4" });
+        }
 
         ShuffleList(remainingDeck);
         state.Deck = remainingDeck;
@@ -107,7 +122,11 @@ public class MythicCardsEngine : IGameEngine
         }
 
         var currentPlayer = room.Players[state.CurrentTurnIndex];
-        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap" && actionType != "surrender" && actionType != "reorder_hand")
+        
+        bool isMyTurn = currentPlayer.PlayerId == playerId;
+        bool isAllowedOutOfTurn = actionType == "insert_trap" || actionType == "surrender" || actionType == "reorder_hand" || actionType == "resolve_pending_action" || actionType == "resolve_exploding_timer" || actionType == "play_card";
+
+        if (!isMyTurn && !isAllowedOutOfTurn)
         {
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
         }
@@ -137,9 +156,121 @@ public class MythicCardsEngine : IGameEngine
             case "surrender":
                 return Task.FromResult(HandleSurrender(room, state, playerId));
 
+            case "resolve_pending_action":
+                return Task.FromResult(HandleResolvePendingAction(room, state, playerId));
+            
+            case "resolve_exploding_timer":
+                return Task.FromResult(HandleResolveExplodingTimer(room, state, playerId));
+                
+            case "give_favor_card":
+                return Task.FromResult(HandleGiveFavorCard(room, state, playerId, payload));
+
             default:
                 return Task.FromResult(new GameActionResult { Success = false, Message = "Hành động không hợp lệ" });
         }
+    }
+
+    private GameActionResult HandleResolvePendingAction(RoomModel room, MythicCardsState state, string playerId)
+    {
+        var pending = state.CurrentPendingAction;
+        if (pending == null) return new GameActionResult { Success = false, Message = "Không có hành động chờ xử lý" };
+
+        bool isCancelled = pending.NopeCount % 2 != 0;
+        state.CurrentPendingAction = null; // Clear it
+
+        if (isCancelled)
+        {
+            state.GameLogs.Add("🛑 Hành động đã bị huỷ bỏ bởi Chặn (Nope)!");
+            return new GameActionResult { Success = true, ActionType = "action_noped", Data = SanitizeStateForBroadcast(room, state) };
+        }
+
+        // Khôi phục lại action ban đầu
+        state.GameLogs.Add("✅ Hành động được thông qua.");
+        var payload = pending.Payload;
+        
+        // Cần truyền đúng cardsToPlay, do bài đã bị remove, ta phải mock lại từ payload
+        if (!payload.TryGetProperty("cardIds", out var cardIdsProp)) return new GameActionResult { Success = false, Message = "Lỗi payload" };
+        
+        var cardIds = cardIdsProp.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+        var cardsToPlay = new List<CardModel>();
+        foreach (var id in cardIds)
+        {
+            // Bài đã nằm trong discard pile
+            var c = state.DiscardPile.FirstOrDefault(x => x.Id == id);
+            if (c != null) cardsToPlay.Add(c);
+        }
+
+        if (cardsToPlay.Count == 1)
+        {
+            return ExecuteSingleCardEffect(room, state, pending.SourcePlayerId, cardsToPlay[0], payload);
+        }
+        else if (cardsToPlay.Count > 1)
+        {
+            return ExecuteComboEffect(room, state, pending.SourcePlayerId, cardsToPlay, payload);
+        }
+
+        return new GameActionResult { Success = true, ActionType = "action_resolved", Data = SanitizeStateForBroadcast(room, state) };
+    }
+
+    private GameActionResult HandleResolveExplodingTimer(RoomModel room, MythicCardsState state, string playerId)
+    {
+        if (!state.IsExploding || state.ExplodingPlayerId == null)
+        {
+            return new GameActionResult { Success = false, Message = "Không hợp lệ" };
+        }
+
+        var victimId = state.ExplodingPlayerId;
+        var player = room.Players.FirstOrDefault(p => p.PlayerId == victimId);
+        if (player == null) return new GameActionResult { Success = false, Message = "Lỗi" };
+
+        player.IsAlive = false;
+        
+        state.IsExploding = false;
+        state.ExplodingPlayerId = null;
+        state.ExplodeExpiryTime = null;
+        
+        state.GameLogs.Add($"💥 BÙM! {player.PlayerName} đã nổ tung vì không gỡ bẫy kịp thời!");
+
+        var victimHand = state.PlayerHands[victimId];
+        state.DiscardPile.AddRange(victimHand);
+        state.PlayerHands[victimId].Clear();
+
+        return CheckGameOverOrContinue(room, state, "player_exploded", new { playerId = victimId });
+    }
+
+    private GameActionResult HandleGiveFavorCard(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
+    {
+        if (!state.AwaitingFavorResponse || state.PendingFavorTargetId != playerId)
+        {
+            return new GameActionResult { Success = false, Message = "Không có ai xin xỏ bạn cả!" };
+        }
+
+        if (!payload.TryGetProperty("cardId", out var cardIdProp))
+        {
+            return new GameActionResult { Success = false, Message = "Chưa chọn bài" };
+        }
+        string cardId = cardIdProp.GetString() ?? "";
+        
+        var hand = state.PlayerHands[playerId];
+        var card = hand.FirstOrDefault(c => c.Id == cardId);
+        if (card == null) return new GameActionResult { Success = false, Message = "Lá bài không tồn tại trên tay" };
+
+        var sourceId = state.PendingFavorSourceId!;
+        var sourceHand = state.PlayerHands[sourceId];
+        
+        hand.Remove(card);
+        sourceHand.Add(card);
+
+        state.AwaitingFavorResponse = false;
+        state.PendingFavorSourceId = null;
+        state.PendingFavorTargetId = null;
+
+        var targetName = room.Players.First(p => p.PlayerId == playerId).PlayerName;
+        var sourceName = room.Players.First(p => p.PlayerId == sourceId).PlayerName;
+
+        state.GameLogs.Add($"{targetName} đã cho {sourceName} 1 lá bài theo yêu cầu Xin Xỏ.");
+
+        return new GameActionResult { Success = true, ActionType = "favor_resolved", Data = SanitizeStateForBroadcast(room, state) };
     }
 
     private GameActionResult HandleSurrender(RoomModel room, MythicCardsState state, string playerId)
@@ -185,7 +316,7 @@ public class MythicCardsEngine : IGameEngine
                 if (newHand.Count == hand.Count)
                 {
                     state.PlayerHands[playerId] = newHand;
-                    return new GameActionResult { Success = true, BroadcastState = SanitizeStateForBroadcast(room, state) };
+                    return new GameActionResult { Success = true, ActionType = "reorder_hand", Data = SanitizeStateForBroadcast(room, state) };
                 }
             }
         }
@@ -220,12 +351,94 @@ public class MythicCardsEngine : IGameEngine
             cardsToPlay.Add(c);
         }
 
-        if (cardsToPlay.Any(c => c.Type == CardType.Defuse || c.Type == CardType.ExplodingTrap))
+        if (cardsToPlay.Any(c => c.Type == CardType.ExplodingTrap))
         {
-            return new GameActionResult { Success = false, Message = "Bẫy Nổ và Gỡ Bẫy không thể tự ý đánh ra!" };
+            return new GameActionResult { Success = false, Message = "Không thể tự ý đánh Bẫy Nổ!" };
+        }
+        
+        if (cardsToPlay.Any(c => c.Type == CardType.Defuse) && !state.IsExploding)
+        {
+            return new GameActionResult { Success = false, Message = "Chỉ được dùng Gỡ Bẫy khi đang dính bom!" };
         }
 
-        // Logic đánh 1 lá (Action cơ bản)
+        var currentPlayer = room.Players[state.CurrentTurnIndex];
+        bool isNope = cardsToPlay.Count == 1 && cardsToPlay[0].Type == CardType.Nope;
+        
+        if (currentPlayer.PlayerId != playerId && !isNope)
+        {
+            return new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn, chỉ có thể đánh Chặn (Nope)!" };
+        }
+
+        if (isNope)
+        {
+            if (state.CurrentPendingAction == null)
+            {
+                return new GameActionResult { Success = false, Message = "Không có hành động nào đang chờ để Chặn!" };
+            }
+
+            // Không thể tự chặn bài của chính mình
+            if (state.CurrentPendingAction.SourcePlayerId == playerId)
+            {
+                return new GameActionResult { Success = false, Message = "Bạn không thể tự chặn bài của chính mình!" };
+            }
+            
+            var card = cardsToPlay[0];
+            hand.Remove(card);
+            state.DiscardPile.Add(card);
+            
+            state.CurrentPendingAction.NopeCount++;
+            state.CurrentPendingAction.ExpiryTime = DateTime.UtcNow.AddSeconds(5); // Extend timer
+            
+            string nopeType = state.CurrentPendingAction.NopeCount % 2 == 1 ? "🛑 CHẶN (NOPE)!" : "✅ YUP! (CHẶN LẠI CHẶN)";
+            state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã ném {nopeType}");
+            
+            return new GameActionResult { Success = true, ActionType = "play_card", Data = SanitizeStateForBroadcast(room, state) };
+        }
+
+        if (state.CurrentPendingAction != null)
+        {
+            return new GameActionResult { Success = false, Message = "Đang chờ phân xử hành động trước đó!" };
+        }
+
+        // Handle Defuse
+        if (cardsToPlay.Count == 1 && cardsToPlay[0].Type == CardType.Defuse)
+        {
+            if (!state.IsExploding || state.ExplodingPlayerId != playerId)
+            {
+                return new GameActionResult { Success = false, Message = "Bạn không bị nổ, không thể gỡ bẫy!" };
+            }
+
+            var card = cardsToPlay[0];
+            hand.Remove(card);
+            state.DiscardPile.Add(card);
+
+            // Tìm lá bẫy nổ trong tay và ném ra discard luôn (hoặc để tí insert trap)
+            // Trong game gốc, gỡ bẫy xong thì nhét lại bẫy nổ. Ta đã add bẫy nổ vào tay lúc rút.
+            var trap = hand.FirstOrDefault(c => c.Type == CardType.ExplodingTrap);
+            if (trap != null) hand.Remove(trap); // Sẽ được insert lại sau
+            
+            state.IsExploding = false;
+            state.ExplodingPlayerId = null;
+            state.ExplodeExpiryTime = null;
+            
+            state.AwaitingDefusePlacement = true;
+            state.PendingDefusePlayerId = playerId;
+            state.GameLogs.Add($"🛡️ {room.Players.First(p => p.PlayerId == playerId).PlayerName} đã dùng Gỡ Bẫy kịp thời!");
+            
+            return new GameActionResult
+            {
+                Success = true,
+                ActionType = "trap_defused_need_placement",
+                Data = new
+                {
+                    PlayerId = playerId,
+                    PlayerName = room.Players.First(p => p.PlayerId == playerId).PlayerName,
+                    DeckCount = state.Deck.Count,
+                    RoomState = SanitizeStateForBroadcast(room, state)
+                }
+            };
+        }
+
         if (cardsToPlay.Count == 1)
         {
             var card = cardsToPlay[0];
@@ -233,20 +446,39 @@ public class MythicCardsEngine : IGameEngine
             {
                 return new GameActionResult { Success = false, Message = "Bài thường phải đánh theo bộ, không được đánh lẻ!" };
             }
-
-            hand.Remove(card);
-            state.DiscardPile.Add(card);
-
-            string playerMsg = $"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã đánh lá [{card.Name}] {card.Icon}";
-            state.GameLogs.Add(playerMsg);
-
-            return ExecuteSingleCardEffect(room, state, playerId, card, payload);
         }
         else
         {
-            // Logic đánh Combo (2, 3, 5 lá)
-            return ExecuteComboEffect(room, state, playerId, cardsToPlay, payload);
+            bool isPair = cardsToPlay.Count == 2 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
+            bool isThree = cardsToPlay.Count == 3 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
+            bool isFiveDiff = cardsToPlay.Count == 5 && cardsToPlay.Select(c => c.Type).Distinct().Count() == 5;
+
+            if (!isPair && !isThree && !isFiveDiff)
+            {
+                return new GameActionResult { Success = false, Message = "Combo không hợp lệ! Chỉ được đánh 2 lá giống nhau, 3 lá giống nhau, hoặc 5 lá khác nhau." };
+            }
         }
+
+        foreach (var c in cardsToPlay)
+            {
+                hand.Remove(c);
+                state.DiscardPile.Add(c);
+            }
+
+            string playerMsg = $"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã sử dụng {string.Join(", ", cardsToPlay.Select(c => c.Name))}";
+            state.GameLogs.Add(playerMsg);
+
+            // Ghi vào PendingAction thay vì thực thi ngay
+            state.CurrentPendingAction = new PendingAction
+            {
+                SourcePlayerId = playerId,
+                ActionType = "play_card",
+                Payload = payload,
+                ExpiryTime = DateTime.UtcNow.AddSeconds(5),
+                NopeCount = 0
+            };
+
+            return new GameActionResult { Success = true, ActionType = "play_card", Data = SanitizeStateForBroadcast(room, state) };
     }
 
     private bool IsNormalCard(CardType type)
@@ -344,6 +576,22 @@ public class MythicCardsEngine : IGameEngine
             case CardType.AlterFuture:
                 var top3Alter = state.Deck.Take(3).ToList();
                 extraData = new { FutureCards = top3Alter, IsAlter = true };
+                break;
+            case CardType.Favor:
+                string favorTargetId = "";
+                if (payload.TryGetProperty("targetPlayerId", out var ftProp)) favorTargetId = ftProp.GetString() ?? "";
+                var fTarget = room.Players.FirstOrDefault(p => p.PlayerId == favorTargetId && p.IsAlive && p.PlayerId != playerId);
+                if (fTarget != null && state.PlayerHands[fTarget.PlayerId].Count > 0)
+                {
+                    state.AwaitingFavorResponse = true;
+                    state.PendingFavorSourceId = playerId;
+                    state.PendingFavorTargetId = fTarget.PlayerId;
+                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã Xin Xỏ {fTarget.PlayerName}. Đang chờ chọn bài...");
+                }
+                else
+                {
+                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã Xin Xỏ nhưng mục tiêu không hợp lệ hoặc hết bài!");
+                }
                 break;
         }
 
@@ -489,69 +737,19 @@ public class MythicCardsEngine : IGameEngine
     {
         if (drawnCard.Type == CardType.ExplodingTrap)
         {
-            // Kiểm tra xem có Defuse không
-            var defuseCard = hand.FirstOrDefault(c => c.Type == CardType.Defuse);
-            if (defuseCard != null)
+            state.IsExploding = true;
+            state.ExplodingPlayerId = playerId;
+            state.ExplodeExpiryTime = DateTime.UtcNow.AddSeconds(10);
+            
+            hand.Add(drawnCard);
+            state.GameLogs.Add($"💣 BÁO ĐỘNG! {player.PlayerName} rút phải BẪY NỔ {(isFromBottom ? "từ dưới đáy" : "")}! Có 10 giây để Gỡ Bẫy!");
+
+            return new GameActionResult
             {
-                hand.Remove(defuseCard);
-                state.DiscardPile.Add(defuseCard);
-                state.AwaitingDefusePlacement = true;
-                state.PendingDefusePlayerId = playerId;
-                state.GameLogs.Add($"💣 {player.PlayerName} rút phải BẪY NỔ {(isFromBottom ? "từ dưới đáy" : "")}! Nhưng đã dùng 🛡️ Gỡ Bẫy cứu mạng!");
-
-                return new GameActionResult
-                {
-                    Success = true,
-                    ActionType = "trap_defused_need_placement",
-                    Data = new
-                    {
-                        PlayerId = playerId,
-                        PlayerName = player.PlayerName,
-                        DeckCount = state.Deck.Count,
-                        RoomState = SanitizeStateForBroadcast(room, state)
-                    }
-                };
-            }
-            else
-            {
-                // Bị nổ loại khỏi cuộc chơi
-                player.IsAlive = false;
-                state.DiscardPile.Add(drawnCard);
-                state.GameLogs.Add($"💥 BOOM! {player.PlayerName} rút phải BẪY NỔ {(isFromBottom ? "từ dưới đáy" : "")} và đã BỊ LOẠI khỏi cuộc chơi!");
-
-                var alivePlayers = room.Players.Where(p => p.IsAlive).ToList();
-                if (alivePlayers.Count <= 1)
-                {
-                    var winner = alivePlayers.FirstOrDefault();
-                    return new GameActionResult
-                    {
-                        Success = true,
-                        ActionType = "player_exploded",
-                        IsGameOver = true,
-                        WinnerId = winner?.PlayerId,
-                        WinnerName = winner?.PlayerName,
-                        Data = new
-                        {
-                            explodedPlayerId = player.PlayerId,
-                            PlayerName = player.PlayerName,
-                            RoomState = SanitizeStateForBroadcast(room, state)
-                        }
-                    };
-                }
-
-                AdvanceTurn(room, state);
-                return new GameActionResult
-                {
-                    Success = true,
-                    ActionType = "player_exploded",
-                    Data = new
-                    {
-                        explodedPlayerId = player.PlayerId,
-                        PlayerName = player.PlayerName,
-                        RoomState = SanitizeStateForBroadcast(room, state)
-                    }
-                };
-            }
+                Success = true,
+                ActionType = "player_is_exploding",
+                Data = SanitizeStateForBroadcast(room, state)
+            };
         }
         else
         {
@@ -723,7 +921,16 @@ public class MythicCardsEngine : IGameEngine
             PendingDefusePlayerId = state.PendingDefusePlayerId,
             GameLogs = state.GameLogs.TakeLast(10).ToList(),
             PlayerCardCounts = state.PlayerHands.ToDictionary(k => k.Key, v => v.Value.Count),
-            PlayerHands = state.PlayerHands // Client JS sẽ lọc hoặc hiển thị theo connection ID của mình
+            PlayerHands = state.PlayerHands, // Client JS sẽ lọc hoặc hiển thị theo connection ID của mình
+            
+            // Online Mechanics States
+            IsExploding = state.IsExploding,
+            ExplodingPlayerId = state.ExplodingPlayerId,
+            ExplodeExpiryTime = state.ExplodeExpiryTime,
+            AwaitingFavorResponse = state.AwaitingFavorResponse,
+            PendingFavorSourceId = state.PendingFavorSourceId,
+            PendingFavorTargetId = state.PendingFavorTargetId,
+            CurrentPendingAction = state.CurrentPendingAction
         };
     }
 

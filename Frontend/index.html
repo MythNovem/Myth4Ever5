@@ -132,7 +132,10 @@
 
     <!-- Chat Messages Floating Panel -->
     <div class="panel chat-panel" id="chat-panel">
-        <div class="chat-panel-label">💬 Chat Phòng</div>
+        <div class="chat-panel-label" id="chat-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+            <span>💬 Chat Phòng</span>
+            <span id="chat-toggle-icon">▼</span>
+        </div>
         <div class="chat-messages" id="chat-messages"></div>
     </div>
 
@@ -158,6 +161,23 @@
                 const code = document.getElementById('display-room-code').innerText;
                 navigator.clipboard.writeText(code);
                 window.lobbyManager.showToast('Đã sao chép mã phòng!', 'success');
+            });
+
+            // Chat toggle logic
+            const chatToggle = document.getElementById('chat-toggle');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatPanel = document.getElementById('chat-panel');
+            const toggleIcon = document.getElementById('chat-toggle-icon');
+            chatToggle.addEventListener('click', () => {
+                if (chatMessages.style.display === 'none') {
+                    chatMessages.style.display = 'block';
+                    chatPanel.style.height = '200px';
+                    toggleIcon.innerText = '▼';
+                } else {
+                    chatMessages.style.display = 'none';
+                    chatPanel.style.height = 'auto';
+                    toggleIcon.innerText = '▲';
+                }
             });
 
             // Kết nối SignalR C# Backend (Hỗ trợ cả môi trường Dev ở máy và Deploy)

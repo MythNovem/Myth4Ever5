@@ -3,6 +3,7 @@ class MythicCardsRenderer {
         this.container = null;
         this.gameState = null;
         this.selectedCardIds = [];
+        this.activeTimers = [];
         window.gameLoader.registerRenderer('mythic_cards', this);
     }
 
@@ -143,7 +144,8 @@ class MythicCardsRenderer {
     }
 
     handleAction(actionType, data) {
-        if (data.roomState) this.updateState(data.roomState);
+        const stateToUpdate = data.roomState || (data.deckCount !== undefined ? data : null);
+        if (stateToUpdate) this.updateState(stateToUpdate);
 
         if (actionType === 'card_played' && data.extraData?.futureCards) {
             const myId = window.signalRService.getPlayerId();
@@ -181,6 +183,19 @@ class MythicCardsRenderer {
 
     updateState(state) {
         this.gameState = state;
+        
+        // Clear old timers
+        this.activeTimers.forEach(t => clearInterval(t));
+        this.activeTimers = [];
+        
+        // Clear UI containers for banner
+        let bannerContainer = document.getElementById('action-banner-container');
+        if (!bannerContainer) {
+            bannerContainer = document.createElement('div');
+            bannerContainer.id = 'action-banner-container';
+            document.body.appendChild(bannerContainer);
+        }
+        bannerContainer.innerHTML = '';
 
         // Deck & discard
         const deckCountEl = document.getElementById('deck-count');
@@ -221,6 +236,9 @@ class MythicCardsRenderer {
                 .join('');
             logsBox.scrollTop = logsBox.scrollHeight;
         }
+
+        this.renderTimers(state, myId);
+        this.renderFavorTarget(state, myId);
     }
 
     // Ghế ngồi động: chính giữa dưới = bản thân, xung quanh = đối thủ
@@ -707,6 +725,7 @@ class MythicCardsRenderer {
     }
 
     handleGameOver(winnerId, winnerName, summary) {
+        this.activeTimers.forEach(t => clearInterval(t));
         document.getElementById('card-modal-container').innerHTML = `
             <div class="modal-backdrop">
                 <div class="modal-box gameover-modal">
@@ -722,6 +741,165 @@ class MythicCardsRenderer {
                 </div>
             </div>
         `;
+    }
+
+    renderTimers(state, myId) {
+        const bannerContainer = document.getElementById('action-banner-container');
+        if (!bannerContainer) return;
+
+        // 1. Exploding Timer
+        if (state.isExploding && state.explodeExpiryTime) {
+            const expiryTime = new Date(state.explodeExpiryTime).getTime();
+            const now = new Date().getTime();
+            if (expiryTime > now) {
+                const isMe = state.explodingPlayerId === myId;
+                const pName = isMe ? "BẠN" : (window.lobbyManager.currentRoom.players.find(p => p.playerId === state.explodingPlayerId)?.playerName || "Ai đó");
+                
+                const banner = document.createElement('div');
+                banner.className = 'action-banner exploding';
+                banner.innerHTML = `
+                    <div class="banner-title">💣 BÁO ĐỘNG BẪY NỔ! 💣</div>
+                    <div class="banner-subtitle">${pName} đang phải gỡ bẫy! Nhanh lên!</div>
+                    <div class="progress-container"><div class="progress-bar" id="exploding-progress" style="width: 100%"></div></div>
+                `;
+                bannerContainer.appendChild(banner);
+
+                const timerId = setInterval(() => {
+                    const timeLeft = expiryTime - new Date().getTime();
+                    if (timeLeft <= 0) {
+                        clearInterval(timerId);
+                        window.signalRService.sendGameAction('resolve_exploding_timer', {});
+                    } else {
+                        const progress = document.getElementById('exploding-progress');
+                        if (progress) progress.style.width = `${(timeLeft / 10000) * 100}%`;
+                    }
+                }, 50);
+                this.activeTimers.push(timerId);
+                return; // Prioritize explosion
+            }
+        }
+
+        // 2. Pending Action (Nope Window)
+        if (state.currentPendingAction && state.currentPendingAction.expiryTime) {
+            const expiryTime = new Date(state.currentPendingAction.expiryTime).getTime();
+            const now = new Date().getTime();
+            if (expiryTime > now) {
+                const actionSourceId = state.currentPendingAction.sourcePlayerId;
+                const pName = actionSourceId === myId ? "Bạn" : (window.lobbyManager.currentRoom.players.find(p => p.playerId === actionSourceId)?.playerName || "Người chơi");
+                const isNoped = state.currentPendingAction.nopeCount % 2 !== 0;
+
+                const banner = document.createElement('div');
+                banner.className = 'action-banner';
+                banner.innerHTML = `
+                    <div class="banner-title">⏱️ ${isNoped ? "🛑 ĐÃ BỊ CHẶN! 🛑" : "ĐANG CHỜ PHẢN HỒI"}</div>
+                    <div class="banner-subtitle">${pName} vừa dùng bài. Còn vài giây để ném Chặn! (Nope: ${state.currentPendingAction.nopeCount})</div>
+                    <div class="progress-container"><div class="progress-bar" id="nope-progress" style="width: 100%; background: ${isNoped ? '#ef4444' : 'var(--gold-bright)'}"></div></div>
+                `;
+                bannerContainer.appendChild(banner);
+
+                const timerId = setInterval(() => {
+                    const timeLeft = expiryTime - new Date().getTime();
+                    if (timeLeft <= 0) {
+                        clearInterval(timerId);
+                        window.signalRService.sendGameAction('resolve_pending_action', {});
+                    } else {
+                        const progress = document.getElementById('nope-progress');
+                        // 5 seconds timer
+                        if (progress) progress.style.width = `${(timeLeft / 5000) * 100}%`;
+                    }
+                }, 50);
+                this.activeTimers.push(timerId);
+
+                // Check if I have a Nope card
+                const myHand = state.playerHands[myId] || [];
+                const nopeCard = myHand.find(c => c.type === 'Nope');
+                if (nopeCard) {
+                    const btnContainer = document.createElement('div');
+                    btnContainer.className = 'nope-btn-container';
+                    btnContainer.innerHTML = `<button class="btn-nope">🛑 ĐÁNH CHẶN (NOPE)</button>`;
+                    btnContainer.querySelector('.btn-nope').addEventListener('click', () => {
+                        window.signalRService.sendGameAction('play_card', { cardIds: [nopeCard.id] });
+                        btnContainer.remove();
+                    });
+                    bannerContainer.appendChild(btnContainer);
+                }
+            }
+        }
+    }
+
+    renderFavorTarget(state, myId) {
+        if (!state.awaitingFavorResponse) return;
+
+        // If I am the target
+        if (state.pendingFavorTargetId === myId) {
+            const sourceName = window.lobbyManager.currentRoom.players.find(p => p.playerId === state.pendingFavorSourceId)?.playerName || "Ai đó";
+            const myHand = state.playerHands[myId] || [];
+
+            document.getElementById('card-modal-container').innerHTML = `
+                <div class="modal-backdrop" style="z-index: 10000; background: rgba(0,0,0,0.85);">
+                    <div class="modal-box" style="max-width: 600px;">
+                        <div class="modal-title">🙏 XIN XỎ!</div>
+                        <div class="modal-subtitle"><strong>${sourceName}</strong> đang dùng thẻ Xin Xỏ lên bạn. Hãy nộp 1 lá bài bất kỳ!</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
+                            ${myHand.map(c => `
+                                <div class="game-card card--${c.type.toLowerCase()}" style="transform: scale(0.9); margin: -5px; cursor: pointer" data-favor-id="${c.id}">
+                                    <span class="card-type-label">${c.type}</span>
+                                    <span class="card-icon">${c.icon}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.querySelectorAll('.game-card[data-favor-id]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const cardId = el.getAttribute('data-favor-id');
+                    window.signalRService.sendGameAction('give_favor_card', { cardId: cardId });
+                    document.getElementById('card-modal-container').innerHTML = '';
+                });
+            });
+        }
+    }
+
+    handleGameOver(winnerId, winnerName, summary) {
+        // Clear all timers
+        this.activeTimers.forEach(t => clearInterval(t));
+        this.activeTimers = [];
+
+        // Clear action banner container
+        const bannerContainer = document.getElementById('action-banner-container');
+        if (bannerContainer) bannerContainer.innerHTML = '';
+        
+        const myId = window.signalRService.getPlayerId();
+        const isMe = winnerId === myId;
+        const title = isMe ? "🏆 BẠN ĐÃ CHIẾN THẮNG! 🏆" : "💀 TRÒ CHƠI KẾT THÚC! 💀";
+        const subtitle = isMe ? "Tuyệt vời! Bạn là người sống sót cuối cùng!" : `Người chiến thắng là: <strong>${winnerName}</strong>`;
+        
+        if (window.soundFX) window.soundFX.play(isMe ? 'victory' : 'explosion'); // optionally play sound
+
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop" style="z-index: 10000; background: rgba(0,0,0,0.9);">
+                <div class="modal-box" style="max-width: 500px; text-align: center; border: 2px solid var(--gold-bright);">
+                    <div class="modal-title" style="font-size: 24px; color: ${isMe ? 'var(--gold-bright)' : 'var(--crimson-bright)'}; margin-bottom: 12px;">${title}</div>
+                    <div class="modal-subtitle" style="font-size: 16px; margin-bottom: 24px;">${subtitle}</div>
+                    <button class="btn btn-primary" id="btn-return-lobby" style="width: 100%; font-size: 16px; padding: 12px;">Quay lại phòng chờ</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('btn-return-lobby').addEventListener('click', () => {
+            document.getElementById('card-modal-container').innerHTML = '';
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('room-view').style.display = 'block';
+            
+            // Hiện lại header nếu bị ẩn
+            const header = document.querySelector('.app-header');
+            if (header) header.style.display = 'flex';
+            
+            // Xóa nội dung game cũ
+            document.getElementById('game-container').innerHTML = '';
+        });
     }
 }
 

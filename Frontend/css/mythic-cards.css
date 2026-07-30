@@ -281,13 +281,27 @@
 
 .hand-cards {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding: 8px 16px 4px;
-    scrollbar-width: none;
-    width: 100%;
-    max-width: 880px;
+    padding: 8px 16px 12px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto;
+    /* Custom scrollbar for better visibility */
+    scrollbar-width: thin;
+    scrollbar-color: var(--violet-mid) var(--surface-0);
+}
+.hand-cards::-webkit-scrollbar {
+    height: 8px;
+}
+.hand-cards::-webkit-scrollbar-track {
+    background: var(--surface-0);
+    border-radius: 4px;
+}
+.hand-cards::-webkit-scrollbar-thumb {
+    background: var(--violet-mid);
+    border-radius: 4px;
 }
 
 .hand-cards .game-card {
@@ -659,4 +673,98 @@
 
 .shake {
     animation: screenShake 0.5s var(--ease-in-out);
+}
+
+/* ============================================
+   NOPE & EXPLODING TIMER UI
+   ============================================ */
+.action-banner {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 15, 30, 0.95);
+    border: 2px solid var(--violet-mid);
+    padding: 16px 24px;
+    border-radius: var(--r-xl);
+    box-shadow: 0 8px 32px rgba(123, 82, 214, 0.4);
+    z-index: 1000;
+    text-align: center;
+    min-width: 300px;
+    animation: modalIn 0.3s var(--ease-out);
+    backdrop-filter: blur(10px);
+}
+
+.action-banner.exploding {
+    border-color: #ef4444;
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.6);
+    background: rgba(30, 10, 10, 0.95);
+    animation: pulseRed 1s infinite alternate;
+}
+
+@keyframes pulseRed {
+    from { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); }
+    to { box-shadow: 0 0 60px rgba(239, 68, 68, 0.8); }
+}
+
+.banner-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.banner-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.progress-container {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--gold-bright);
+    width: 100%;
+    transition: width 0.1s linear;
+}
+
+.action-banner.exploding .progress-bar {
+    background: #ef4444;
+}
+
+.nope-btn-container {
+    position: fixed;
+    bottom: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+}
+
+.btn-nope {
+    background: #ef4444;
+    color: white;
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    padding: 16px 32px;
+    border-radius: var(--r-full);
+    border: 2px solid #fca5a5;
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.6);
+    cursor: pointer;
+    animation: pulseRed 1s infinite alternate;
+    transition: transform 0.1s;
+}
+
+.btn-nope:hover {
+    transform: scale(1.05);
+}
+
+.btn-nope:active {
+    transform: scale(0.95);
 }
