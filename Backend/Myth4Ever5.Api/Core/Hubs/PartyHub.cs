@@ -82,6 +82,32 @@ public class PartyHub : Hub<IPartyClient>
         }
     }
 
+    public async Task SelectGame(string gameTypeId)
+    {
+        var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);
+        if (room == null)
+        {
+            await Clients.Caller.ErrorNotification("Không tìm thấy phòng chơi!");
+            return;
+        }
+
+        if (room.HostConnectionId != Context.ConnectionId)
+        {
+            await Clients.Caller.ErrorNotification("Chỉ có Chủ phòng mới có quyền chọn Game!");
+            return;
+        }
+
+        var engine = _engineFactory.GetEngine(gameTypeId);
+        if (engine == null)
+        {
+            await Clients.Caller.ErrorNotification("Game không hợp lệ!");
+            return;
+        }
+
+        room.SelectedGameTypeId = gameTypeId;
+        await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+    }
+
     public async Task StartGame()
     {
         var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);

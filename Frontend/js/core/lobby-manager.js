@@ -45,6 +45,11 @@ class LobbyManager {
             await window.signalRService.startGame();
         });
 
+        // Game Selection Change (Host)
+        document.getElementById('select-game-type')?.addEventListener('change', async (e) => {
+            await window.signalRService.selectGame(e.target.value);
+        });
+
         // Chat Send
         document.getElementById('btn-send-chat')?.addEventListener('click', () => this.sendChat());
         document.getElementById('chat-input')?.addEventListener('keyup', (e) => {
@@ -118,6 +123,12 @@ class LobbyManager {
 
         const myPlayerId = window.signalRService.getPlayerId();
         const isHost = room.hostConnectionId === room.players.find(p => p.playerId === myPlayerId)?.connectionId;
+
+        const gameSelect = document.getElementById('select-game-type');
+        if (gameSelect) {
+            gameSelect.value = room.selectedGameTypeId || 'mythic_cards';
+            gameSelect.disabled = !isHost;
+        }
 
         const startBtn = document.getElementById('btn-start-game');
         if (startBtn) {

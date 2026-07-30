@@ -98,6 +98,15 @@
                 </div>
                 <div id="room-player-list" style="margin-bottom:24px;"></div>
 
+                <!-- Game Selection (Host controls) -->
+                <div style="margin-bottom: 20px; padding-top: 16px; border-top: 1px solid var(--border-dim);" id="game-selection-box">
+                    <div class="caption" style="margin-bottom: 8px;">Chọn Trò Chơi</div>
+                    <select id="select-game-type" class="input-field" style="width: 100%; font-size: 14px; background: var(--surface-2); color: var(--gold-bright);">
+                        <option value="mythic_cards">🎴 Mythic Cards: Trap & Survive (2-4 người)</option>
+                        <option value="number_bomb">💣 Bom Số (Secret Bomb 1-100) (2-8 người)</option>
+                    </select>
+                </div>
+
                 <!-- Start -->
                 <button id="btn-start-game" class="btn btn-primary" style="font-size:15px; padding:14px;">
                     Bắt Đầu Game
@@ -148,7 +157,15 @@
     <script src="js/core/lobby-manager.js"></script>
     <script src="js/core/sound-fx.js"></script>
     <script src="js/core/game-loader.js"></script>
+    
+    <!-- MythicCards Sub-Modules -->
+    <script src="js/games/mythic-cards/mc-seat-renderer.js"></script>
+    <script src="js/games/mythic-cards/mc-hand-renderer.js"></script>
+    <script src="js/games/mythic-cards/mc-timer-renderer.js"></script>
+    <script src="js/games/mythic-cards/mc-modal-manager.js"></script>
+    <script src="js/games/mythic-cards/mc-rules-modal.js"></script>
     <script src="js/games/mythic-cards-renderer.js"></script>
+    <script src="js/games/number-bomb-renderer.js"></script>
 
     <script>
         // Init Audio on first interaction

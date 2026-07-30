@@ -27,8 +27,15 @@ builder.Services.AddSignalR()
 
 // 3. Services & Game Engines
 builder.Services.AddSingleton<RoomManager>();
-builder.Services.AddSingleton<IGameEngine, MythicCardsEngine>();
 builder.Services.AddSingleton<GameEngineFactory>();
+
+// Auto-discover and register all IGameEngine implementations.
+// Adding a new game = create a class implementing IGameEngine — no changes needed here.
+var engineTypes = AppDomain.CurrentDomain.GetAssemblies()
+    .SelectMany(a => a.GetTypes())
+    .Where(t => typeof(IGameEngine).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+foreach (var engineType in engineTypes)
+    builder.Services.AddSingleton(typeof(IGameEngine), engineType);
 
 var app = builder.Build();
 

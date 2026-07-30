@@ -80,6 +80,10 @@ class SignalRService {
         return this.connection.invoke('LeaveRoomExplicit', this.playerId);
     }
 
+    async selectGame(gameTypeId) {
+        return this.connection.invoke('SelectGame', gameTypeId);
+    }
+
     async startGame() {
         return this.connection.invoke('StartGame');
     }
