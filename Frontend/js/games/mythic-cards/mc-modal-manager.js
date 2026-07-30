@@ -256,6 +256,49 @@ class MCModalManager {
             </div>`;
     }
 
+    // ─── Favor Result Popup ──────────────────────────────────────────
+    showFavorResultModal(favorData, myId) {
+        if (!favorData) return;
+        const sourceId   = favorData.sourcePlayerId || favorData.SourcePlayerId;
+        const sourceName = favorData.sourceName || favorData.SourceName || 'Người chơi';
+        const targetId   = favorData.targetPlayerId || favorData.TargetPlayerId;
+        const targetName = favorData.targetName || favorData.TargetName || 'Đối thủ';
+        const card       = favorData.givenCard || favorData.GivenCard;
+
+        if (!card) return;
+
+        const isSource = myId === sourceId;
+        const isTarget = myId === targetId;
+
+        if (!isSource && !isTarget) {
+            window.lobbyManager.showToast(`🎁 ${targetName} vừa cho ${sourceName} 1 lá bài!`, 'info');
+            return;
+        }
+
+        if (isSource) {
+            const titleColor = 'var(--gold-bright)';
+            if (window.soundFX) window.soundFX.play('victory');
+
+            this._container().innerHTML = `
+                <div class="modal-backdrop" style="z-index: 10000; animation: fadeIn 0.25s ease;">
+                    <div class="modal-box" style="text-align: center; border: 2px solid ${titleColor}; max-width: 420px;">
+                        <div style="font-size: 44px; margin-bottom: 4px;">🎁</div>
+                        <div class="modal-title" style="color: ${titleColor}; font-size: 20px;">XIN BÀI THÀNH CÔNG!</div>
+                        <div class="modal-subtitle" style="margin: 8px 0 16px;"><strong>${targetName}</strong> vừa nộp cho bạn lá bài này:</div>
+                        <div class="game-card card--${card.type.toLowerCase()}" style="margin: 0 auto 20px; transform: scale(1.1); cursor: default;">
+                            <span class="card-type-label">${card.type}</span>
+                            <span class="card-icon">${card.icon}</span>
+                            <span class="card-name">${card.name}</span>
+                            <span class="card-desc">${card.description}</span>
+                        </div>
+                        <button class="btn btn-primary w-full" id="btn-close-favor-result">Tuyệt Mật & Nhận Bài</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('btn-close-favor-result')?.addEventListener('click', () => this.clear());
+        }
+    }
+
     // ─── Discard Browser (5-card combo) ─────────────────────────────────────────
     showDiscardPileModal(gameState) {
         if (!gameState?.discardPile?.length) {

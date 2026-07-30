@@ -35,9 +35,20 @@ public class FavorHandler : IGameActionHandler<MythicCardsState>
 
         var targetName = room.Players.First(p => p.PlayerId == playerId).PlayerName;
         var sourceName = room.Players.First(p => p.PlayerId == sourceId).PlayerName;
-        state.GameLogs.Add($"{targetName} đã cho {sourceName} 1 lá bài theo yêu cầu Xin Xỏ.");
-
-        return new GameActionResult { Success = true, ActionType = "favor_resolved", Data = _ctx.SanitizeState(room, state) };
+        return new GameActionResult
+        {
+            Success = true,
+            ActionType = "favor_resolved",
+            Data = new
+            {
+                SourcePlayerId = sourceId,
+                SourceName = sourceName,
+                TargetPlayerId = playerId,
+                TargetName = targetName,
+                GivenCard = card,
+                RoomState = _ctx.SanitizeState(room, state)
+            }
+        };
     }
 }
 

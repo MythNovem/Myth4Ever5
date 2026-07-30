@@ -276,6 +276,15 @@ class MythicCardsRenderer {
         }
     }
 
+    handleAction(actionType, data) {
+        const myId = window.signalRService.getPlayerId();
+        if (actionType === 'card_stolen' && window.mcModalManager) {
+            window.mcModalManager.showStealResultModal(data, myId);
+        } else if (actionType === 'favor_resolved' && window.mcModalManager) {
+            window.mcModalManager.showFavorResultModal(data, myId);
+        }
+    }
+
     handleGameOver(winnerId, winnerName, summary) {
         if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
         if (window.mcModalManager) window.mcModalManager.showGameOver(winnerId, winnerName);
