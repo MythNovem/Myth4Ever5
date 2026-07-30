@@ -128,8 +128,10 @@ class MCTimerRenderer {
             }, 50);
             this.activeTimers.push(id);
 
-                // Show action buttons (Nope / Pass) for non-source players
-                if (sourceId !== myId) {
+                const lastActionId = pending.lastActionPlayerId || pending.LastActionPlayerId || sourceId;
+
+                // Show action buttons (Nope / Pass) for players who didn't play the last action
+                if (lastActionId !== myId) {
                     const playerHands = state.playerHands || state.PlayerHands || {};
                     const myHand = playerHands[myId] || [];
                     const nopeCard = myHand.find(c => c.type === 'Nope');
@@ -142,7 +144,8 @@ class MCTimerRenderer {
 
                     let buttonsHtml = '';
                     if (nopeCard) {
-                        buttonsHtml += `<button class="btn-nope" id="btn-do-nope">🛑 ĐÁNH CHẶN (NOPE)</button>`;
+                        const nopeBtnText = nopeCount > 0 ? '🛑 CHẶN LẠI CHẶN (NOPE)' : '🛑 ĐÁNH CHẶN (NOPE)';
+                        buttonsHtml += `<button class="btn-nope" id="btn-do-nope">${nopeBtnText}</button>`;
                     }
                     buttonsHtml += `<button class="btn btn-ghost" id="btn-pass-nope" style="background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3); font-size: 13px; padding: 6px 14px;">⏩ Bỏ Qua (Cho Qua)</button>`;
 
