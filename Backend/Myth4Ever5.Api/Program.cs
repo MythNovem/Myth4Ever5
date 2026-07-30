@@ -19,7 +19,11 @@ builder.Services.AddCors(options =>
 });
 
 // 2. SignalR
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 // 3. Services & Game Engines
 builder.Services.AddSingleton<RoomManager>();

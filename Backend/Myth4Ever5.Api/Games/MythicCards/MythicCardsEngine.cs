@@ -142,6 +142,11 @@ public class MythicCardsEngine : IGameEngine
                 return Task.FromResult(HandlePlayCard(room, state, playerId, payload));
 
             case "draw_card":
+                // Khi đang dính bom, không được rút bài — phải gỡ bẫy trước
+                if (state.IsExploding && state.ExplodingPlayerId == playerId)
+                {
+                    return Task.FromResult(new GameActionResult { Success = false, Message = "Bạn đang dính Bẫy Nổ! Hãy dùng lá Gỡ Bẫy trước!" });
+                }
                 return Task.FromResult(HandleDrawCard(room, state, playerId));
 
             case "insert_trap":

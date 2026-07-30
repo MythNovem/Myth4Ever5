@@ -144,7 +144,21 @@ class MythicCardsRenderer {
     }
 
     handleAction(actionType, data) {
-        const stateToUpdate = data.roomState || (data.deckCount !== undefined ? data : null);
+        // Handle multiple possible data shapes from backend:
+        // 1. { roomState: {...} }  → wrapped format
+        // 2. { deckCount: ..., ... } → flat state format
+        // 3. { data: {...} } → nested data format
+        let stateToUpdate = null;
+        if (data && data.roomState) {
+            stateToUpdate = data.roomState;
+        } else if (data && data.deckCount !== undefined) {
+            stateToUpdate = data;
+        } else if (data && data.currentPendingAction !== undefined) {
+            stateToUpdate = data;
+        } else if (data && data.isExploding !== undefined) {
+            stateToUpdate = data;
+        }
+        
         if (stateToUpdate) this.updateState(stateToUpdate);
 
         if (actionType === 'card_played' && data.extraData?.futureCards) {
@@ -305,15 +319,19 @@ class MythicCardsRenderer {
 
         const myHand = state.playerHands[myId] || [];
         const isMyTurn = state.currentTurnPlayerId === myId;
+        const amIExploding = state.isExploding && state.explodingPlayerId === myId;
 
         container.innerHTML = myHand.map(card => {
             const isSelected = this.selectedCardIds.includes(card.id);
+            const isDefuse = card.type.toLowerCase() === 'defuse';
+            // When exploding, dim all non-Defuse cards
+            const dimmed = amIExploding && !isDefuse ? 'style="opacity:0.35; pointer-events:none;"' : '';
             return `
                 <div class="game-card card--${card.type.toLowerCase()} ${isSelected ? 'selected' : ''}"
                      data-card-id="${card.id}"
                      data-card-type="${card.type}"
                      title="${card.description}"
-                     draggable="true">
+                     draggable="true" ${dimmed}>
                     <span class="card-type-label">${card.type}</span>
                     <span class="card-icon">${card.icon}</span>
                     <span class="card-name">${card.name}</span>
@@ -322,17 +340,36 @@ class MythicCardsRenderer {
             `;
         }).join('');
 
+        // Lock deck when exploding
+        const deckPile = document.getElementById('deck-pile');
+        if (deckPile) {
+            if (amIExploding) {
+                deckPile.style.opacity = '0.4';
+                deckPile.style.pointerEvents = 'none';
+                deckPile.querySelector('.pile-label').textContent = '💣 Gỡ bẫy trước!';
+            } else {
+                deckPile.style.opacity = '';
+                deckPile.style.pointerEvents = '';
+                deckPile.querySelector('.pile-label').textContent = 'Bấm để rút';
+            }
+        }
+
         let draggedCard = null;
 
         container.querySelectorAll('.game-card').forEach(cardEl => {
             cardEl.addEventListener('click', () => {
-                if (!isMyTurn) {
+                if (amIExploding && cardEl.getAttribute('data-card-type').toLowerCase() !== 'defuse') {
+                    window.lobbyManager.showToast('Bạn đang dính Bẫy Nổ! Hãy dùng lá Gỡ Bẫy!', 'danger');
+                    return;
+                }
+                if (!isMyTurn && !amIExploding) {
                     window.lobbyManager.showToast('Chưa đến lượt của bạn!', 'warning');
                     return;
                 }
                 const cardId = cardEl.getAttribute('data-card-id');
                 this.toggleCardSelection(cardId);
             });
+
 
             cardEl.addEventListener('dragstart', (e) => {
                 draggedCard = cardEl;
