@@ -20,7 +20,7 @@ public class MythicCardsEngine : IGameEngine
 
         // 1. Tạo các lá bài Action cơ bản
         var actionCards = new List<CardModel>();
-        for (int i = 0; i < 6; i++) // Tăng số lượng bài lên 6 bộ (30 lá) để deck dày hơn
+        for (int i = 0; i < 5; i++) // 5 lá mỗi loại Action cơ bản
         {
             actionCards.Add(new CardModel { Type = CardType.Skip, Name = "Bỏ Lượt", Description = "Bỏ qua lượt hiện tại không cần rút bài", Icon = "⏭️", Color = "#3b82f6" });
             actionCards.Add(new CardModel { Type = CardType.Attack, Name = "Ép Lượt", Description = "Bỏ lượt & ép đối thủ kế tiếp đi 2 lượt", Icon = "🔄", Color = "#ef4444" });
@@ -29,8 +29,8 @@ public class MythicCardsEngine : IGameEngine
             actionCards.Add(new CardModel { Type = CardType.Steal, Name = "Cướp Bài", Description = "Cướp 1 lá ngẫu nhiên trên tay đối thủ", Icon = "🎁", Color = "#f59e0b" });
         }
 
-        // Thêm 4 bản sao cho mỗi loại Bài Thường
-        for (int i = 0; i < 4; i++)
+        // Tăng số lượng Bài Thường lên 8 bản sao để dễ ghép combo
+        for (int i = 0; i < 8; i++)
         {
             actionCards.Add(new CardModel { Type = CardType.Normal1, Name = "Cáo Chín Đuôi", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🦊", Color = "#78716c" });
             actionCards.Add(new CardModel { Type = CardType.Normal2, Name = "Rồng Con", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🐲", Color = "#78716c" });
@@ -39,8 +39,8 @@ public class MythicCardsEngine : IGameEngine
             actionCards.Add(new CardModel { Type = CardType.Normal5, Name = "Golem Đá", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🪨", Color = "#78716c" });
         }
 
-        // Thêm các Bài Phép Mở Rộng
-        for (int i = 0; i < 4; i++)
+        // Các Bài Phép Mở Rộng (3 lá mỗi loại)
+        for (int i = 0; i < 3; i++)
         {
             actionCards.Add(new CardModel { Type = CardType.AlterFuture, Name = "Đổi Tương Lai", Description = "Xem và tự do sắp xếp lại 3 lá đầu tiên", Icon = "🔮", Color = "#c084fc" });
             actionCards.Add(new CardModel { Type = CardType.DrawBottom, Name = "Rút Đáy", Description = "Kết thúc lượt bằng cách rút lá dưới cùng", Icon = "⚓", Color = "#0284c7" });
@@ -74,8 +74,8 @@ public class MythicCardsEngine : IGameEngine
         // 3. Đưa Bẫy Nổ (PlayerCount - 1 = 2) và các lá Defuse còn lại vào Deck chung
         var remainingDeck = new List<CardModel>(actionCards);
         
-        // Thêm 2 lá Bẫy Nổ
-        for (int i = 0; i < room.Players.Count - 1; i++)
+        // Thêm 4 lá Bẫy Nổ mặc định theo yêu cầu
+        for (int i = 0; i < 4; i++)
         {
             remainingDeck.Add(new CardModel { Type = CardType.ExplodingTrap, Name = "Bẫy Nổ", Description = "Nổ tung và loại người chơi khỏi bàn!", Icon = "💣", Color = "#dc2626" });
         }
@@ -107,7 +107,7 @@ public class MythicCardsEngine : IGameEngine
         }
 
         var currentPlayer = room.Players[state.CurrentTurnIndex];
-        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap" && actionType != "surrender")
+        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap" && actionType != "surrender" && actionType != "reorder_hand")
         {
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
         }
@@ -127,6 +127,9 @@ public class MythicCardsEngine : IGameEngine
 
             case "insert_trap":
                 return Task.FromResult(HandleInsertTrap(room, state, playerId, payload));
+
+            case "reorder_hand":
+                return Task.FromResult(HandleReorderHand(room, state, playerId, payload));
 
             case "rearrange_future":
                 return Task.FromResult(HandleRearrangeFuture(room, state, playerId, payload));
@@ -162,6 +165,31 @@ public class MythicCardsEngine : IGameEngine
         }
 
         return CheckGameOverOrContinue(room, state, "player_surrendered", new { surrenderedPlayerId = playerId });
+    }
+
+    private GameActionResult HandleReorderHand(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
+    {
+        if (payload.TryGetProperty("cardIds", out var cardIdsProp))
+        {
+            var cardIds = cardIdsProp.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+            var hand = state.PlayerHands[playerId];
+            
+            if (cardIds.Count == hand.Count)
+            {
+                var newHand = new List<CardModel>();
+                foreach (var id in cardIds)
+                {
+                    var card = hand.FirstOrDefault(c => c.Id == id);
+                    if (card != null) newHand.Add(card);
+                }
+                if (newHand.Count == hand.Count)
+                {
+                    state.PlayerHands[playerId] = newHand;
+                    return new GameActionResult { Success = true, BroadcastState = SanitizeStateForBroadcast(room, state) };
+                }
+            }
+        }
+        return new GameActionResult { Success = false, Message = "Invalid reorder payload" };
     }
 
     private GameActionResult HandlePlayCard(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
@@ -262,16 +290,29 @@ public class MythicCardsEngine : IGameEngine
                 {
                     targetId = targetProp.GetString() ?? "";
                 }
+                
+                int targetCardIndex = -1;
+                if (payload.TryGetProperty("targetCardIndex", out var targetIndexProp) && targetIndexProp.ValueKind == JsonValueKind.Number)
+                {
+                    targetCardIndex = targetIndexProp.GetInt32();
+                }
 
                 var aliveTargets = room.Players.Where(p => p.PlayerId != playerId && p.IsAlive && state.PlayerHands[p.PlayerId].Count > 0).ToList();
                 if (aliveTargets.Count > 0)
                 {
                     var target = aliveTargets.FirstOrDefault(p => p.PlayerId == targetId) ?? aliveTargets[_random.Next(aliveTargets.Count)];
                     var targetHand = state.PlayerHands[target.PlayerId];
-                    var stolenCard = targetHand[_random.Next(targetHand.Count)];
-                    targetHand.Remove(stolenCard);
+                    
+                    int stealIndex = targetCardIndex;
+                    if (stealIndex < 0 || stealIndex >= targetHand.Count)
+                    {
+                        stealIndex = _random.Next(targetHand.Count);
+                    }
+                    
+                    var stolenCard = targetHand[stealIndex];
+                    targetHand.RemoveAt(stealIndex);
                     hand.Add(stolenCard);
-                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã cướp 1 lá bài của {target.PlayerName}!");
+                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã cướp lá bài thứ {stealIndex + 1} của {target.PlayerName}!");
                 }
                 break;
             case CardType.TargetedAttack:

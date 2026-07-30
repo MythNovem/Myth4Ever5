@@ -16,6 +16,9 @@ class MythicCardsRenderer {
     renderTableSkeleton() {
         this.container.innerHTML = `
             <div style="width: 100%; display: flex; justify-content: flex-end; padding: 10px 24px 0; gap: 8px;">
+                <button class="btn btn-ghost" id="btn-fullscreen" style="font-size: 13px; color: var(--emerald-bright); border-color: var(--emerald);">
+                    ⛶ Toàn Màn Hình
+                </button>
                 <button class="btn btn-ghost" id="btn-surrender-game" style="font-size: 13px; color: var(--crimson-bright); border-color: var(--crimson);">
                     🏳️ Chịu Thua
                 </button>
@@ -58,8 +61,10 @@ class MythicCardsRenderer {
             if (!this.gameState) return;
             const myId = window.signalRService.getPlayerId();
             if (this.gameState.currentTurnPlayerId === myId) {
+                if (window.soundFX) window.soundFX.play('draw');
                 window.signalRService.sendGameAction('draw_card', {});
             } else {
+                if (window.soundFX) window.soundFX.play('error');
                 window.lobbyManager.showToast('Chưa đến lượt của bạn!', 'warning');
             }
         });
@@ -73,6 +78,19 @@ class MythicCardsRenderer {
                 await window.signalRService.sendGameAction('surrender', {});
                 await window.signalRService.leaveRoomExplicit();
                 window.lobbyManager.clearRoomState();
+            }
+        });
+
+        document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
+            const btn = document.getElementById('btn-fullscreen');
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    window.lobbyManager.showToast('Trình duyệt không hỗ trợ toàn màn hình.', 'warning');
+                });
+                btn.innerText = '⛶ Thu Nhỏ';
+            } else {
+                document.exitFullscreen();
+                btn.innerText = '⛶ Toàn Màn Hình';
             }
         });
     }
@@ -89,16 +107,17 @@ class MythicCardsRenderer {
                         <ul style="margin-left: 16px; margin-bottom: 12px;">
                             <li style="margin-bottom: 6px;"><b>Mục tiêu:</b> Là người sống sót cuối cùng bằng cách KHÔNG rút phải <b>Bẫy Nổ</b>.</li>
                             <li style="margin-bottom: 6px;"><b>Lượt đi:</b> Đến lượt, bạn có thể đánh <b>vô số lá bài trên tay</b> (hoặc không đánh lá nào). Sau khi đánh bài xong, bạn kết thúc lượt bằng cách <b>rút 1 lá bài</b>.</li>
-                            <li style="margin-bottom: 6px;"><b>Bẫy Nổ (💣):</b> Rút phải nó là chết. Trừ khi bạn có <b>Gỡ Bẫy</b>.</li>
-                            <li style="margin-bottom: 6px;"><b>Gỡ Bẫy (🛡️):</b> Nếu rút phải Bẫy Nổ và dùng Gỡ Bẫy, bạn được quyền nhét lại quả Bẫy Nổ đó vào <b>bất kỳ vị trí nào</b> trong xấp bài để bẫy người khác.</li>
-                            <li style="margin-bottom: 6px;"><b>Bỏ Lượt (⏭️):</b> Chấm dứt lượt mà <b>không cần rút bài</b>. Nếu bạn đang bị "Ép Lượt", lá này chỉ huỷ 1 lượt.</li>
-                            <li style="margin-bottom: 6px;"><b>Ép Lượt (🔄):</b> Chấm dứt ngay lượt của bạn và bắt <b>người tiếp theo đi 2 lượt</b> liên tiếp.</li>
-                            <li style="margin-bottom: 6px;"><b>Nhìn Tương Lai (👁️):</b> Xem bí mật 3 lá trên cùng của xấp bài rút.</li>
-                            <li style="margin-bottom: 6px;"><b>Xáo Bài (🔀):</b> Xáo trộn lại xấp bài rút.</li>
-                            <li style="margin-bottom: 6px;"><b>Cướp Bài (🎁):</b> Lấy ngẫu nhiên 1 lá bài từ đối thủ.</li>
-                            <li style="margin-bottom: 6px;"><b>Đổi Tương Lai (🔮):</b> Xem 3 lá trên cùng và <b>sắp xếp lại</b> thứ tự.</li>
-                            <li style="margin-bottom: 6px;"><b>Rút Đáy (⚓):</b> Kết thúc lượt bằng cách <b>rút lá dưới cùng</b> của bộ bài.</li>
-                            <li style="margin-bottom: 6px;"><b>Ám Sát (🎯):</b> Chấm dứt lượt của bạn và ép <b>một người chơi bất kỳ phải đi 2 lượt</b> liên tiếp.</li>
+                            <li style="margin-bottom: 6px;"><b>Bẫy Nổ (💣) - 4 lá:</b> Rút phải nó là chết. Trừ khi bạn có <b>Gỡ Bẫy</b>.</li>
+                            <li style="margin-bottom: 6px;"><b>Gỡ Bẫy (🛡️) - Giới hạn:</b> Nếu rút phải Bẫy Nổ và dùng Gỡ Bẫy, bạn được quyền nhét lại quả Bẫy Nổ đó vào <b>bất kỳ vị trí nào</b> trong xấp bài để bẫy người khác.</li>
+                            <li style="margin-bottom: 6px;"><b>Bỏ Lượt (⏭️) - 5 lá:</b> Chấm dứt lượt mà <b>không cần rút bài</b>. Nếu đang bị "Ép Lượt", lá này chỉ huỷ 1 lượt.</li>
+                            <li style="margin-bottom: 6px;"><b>Ép Lượt (🔄) - 5 lá:</b> Chấm dứt ngay lượt của bạn và bắt <b>người tiếp theo đi 2 lượt</b> liên tiếp.</li>
+                            <li style="margin-bottom: 6px;"><b>Nhìn Tương Lai (👁️) - 5 lá:</b> Xem bí mật 3 lá trên cùng của xấp bài rút.</li>
+                            <li style="margin-bottom: 6px;"><b>Xáo Bài (🔀) - 5 lá:</b> Xáo trộn lại xấp bài rút.</li>
+                            <li style="margin-bottom: 6px;"><b>Cướp Bài (🎁) - 5 lá:</b> Cho phép chọn và cướp 1 lá bất kỳ trên tay đối thủ.</li>
+                            <li style="margin-bottom: 6px;"><b>Đổi Tương Lai (🔮) - 3 lá:</b> Xem 3 lá trên cùng và <b>sắp xếp lại</b> thứ tự.</li>
+                            <li style="margin-bottom: 6px;"><b>Rút Đáy (⚓) - 3 lá:</b> Kết thúc lượt bằng cách <b>rút lá dưới cùng</b> của bộ bài.</li>
+                            <li style="margin-bottom: 6px;"><b>Ám Sát (🎯) - 3 lá:</b> Ép một người chơi bất kỳ phải đi 2 lượt liên tiếp.</li>
+                            <li style="margin-bottom: 6px;"><b>Bài Thường (🦊🐲🐺🧚🪨) - 40 lá:</b> Không có tác dụng đơn lẻ. Hãy dùng tính năng <b>chọn nhiều lá (Combo)</b> bằng cách click nhiều lá bài thường giống nhau để kích hoạt hiệu ứng đặc biệt (2 lá cướp bài, 3 lá xem bài).</li>
                         </ul>
                         
                         <div style="font-weight: bold; color: var(--gold-bright); margin: 16px 0 8px;">🎮 LUẬT COMBO BÀI THƯỜNG</div>
@@ -148,11 +167,13 @@ class MythicCardsRenderer {
         if (actionType === 'trap_defused_need_placement') {
             const myId = window.signalRService.getPlayerId();
             if (data.playerId === myId) {
+                if (window.soundFX) window.soundFX.play('defuse');
                 this.showDefusePlacementModal(data.deckCount);
             }
         }
 
         if (actionType === 'player_exploded') {
+            if (window.soundFX) window.soundFX.play('explosion');
             document.getElementById('card-table')?.classList.add('shake');
             setTimeout(() => document.getElementById('card-table')?.classList.remove('shake'), 550);
         }
@@ -273,7 +294,8 @@ class MythicCardsRenderer {
                 <div class="game-card card--${card.type.toLowerCase()} ${isSelected ? 'selected' : ''}"
                      data-card-id="${card.id}"
                      data-card-type="${card.type}"
-                     title="${card.description}">
+                     title="${card.description}"
+                     draggable="true">
                     <span class="card-type-label">${card.type}</span>
                     <span class="card-icon">${card.icon}</span>
                     <span class="card-name">${card.name}</span>
@@ -281,6 +303,8 @@ class MythicCardsRenderer {
                 </div>
             `;
         }).join('');
+
+        let draggedCard = null;
 
         container.querySelectorAll('.game-card').forEach(cardEl => {
             cardEl.addEventListener('click', () => {
@@ -291,9 +315,50 @@ class MythicCardsRenderer {
                 const cardId = cardEl.getAttribute('data-card-id');
                 this.toggleCardSelection(cardId);
             });
+
+            cardEl.addEventListener('dragstart', (e) => {
+                draggedCard = cardEl;
+                setTimeout(() => cardEl.style.opacity = '0.5', 0);
+            });
+
+            cardEl.addEventListener('dragend', () => {
+                if (draggedCard) draggedCard.style.opacity = '1';
+                draggedCard = null;
+            });
+        });
+
+        container.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedCard) return;
+            const afterElement = this.getDragAfterElement(container, e.clientX);
+            if (afterElement == null) {
+                container.appendChild(draggedCard);
+            } else {
+                container.insertBefore(draggedCard, afterElement);
+            }
+        });
+
+        container.addEventListener('drop', e => {
+            e.preventDefault();
+            const newOrder = Array.from(container.querySelectorAll('.game-card')).map(el => el.getAttribute('data-card-id'));
+            window.signalRService.sendGameAction('reorder_hand', { cardIds: newOrder });
         });
 
         this.renderPlayButton(isMyTurn);
+    }
+
+    getDragAfterElement(container, x) {
+        const draggableElements = [...container.querySelectorAll('.game-card:not([style*="opacity: 0.5"])')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = x - box.left - box.width / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     toggleCardSelection(cardId) {
@@ -359,6 +424,7 @@ class MythicCardsRenderer {
                 return;
             }
             // Just normal single card
+            if (window.soundFX) window.soundFX.play('play');
             window.signalRService.sendGameAction('play_card', { cardIds: this.selectedCardIds });
             this.selectedCardIds = [];
         } else if (count === 2) {
@@ -540,11 +606,62 @@ class MythicCardsRenderer {
                 if (cardIds.length === 3) {
                     payload.targetCardType = document.getElementById('target-card-type-select').value;
                 }
-                window.signalRService.sendGameAction('play_card', payload);
-                this.selectedCardIds = [];
-                document.getElementById('card-modal-container').innerHTML = '';
+                
+                const isSteal = cardIds.length === 1 && this.gameState.playerHands[myId].find(c => c.id === cardIds[0])?.type === 'Steal';
+                if (isSteal) {
+                    this.showStealPickerModal(targetPlayerId, cardIds);
+                } else {
+                    if (window.soundFX) window.soundFX.play('play');
+                    window.signalRService.sendGameAction('play_card', payload);
+                    this.selectedCardIds = [];
+                    document.getElementById('card-modal-container').innerHTML = '';
+                }
             });
         });
+    }
+
+    showStealPickerModal(targetPlayerId, cardIds) {
+        const room = window.lobbyManager.currentRoom;
+        const target = room.players.find(p => p.playerId === targetPlayerId);
+        const cardCount = this.gameState.playerCardCounts?.[targetPlayerId] ?? 0;
+        
+        if (cardCount === 0) {
+            window.lobbyManager.showToast('Mục tiêu không có bài trên tay!', 'warning');
+            return;
+        }
+
+        const cardsHtml = Array.from({length: cardCount}).map((_, i) => `
+            <div class="game-card card--hidden" style="cursor: pointer; transform: scale(0.9); margin: -5px;" onclick="window.mythicCardsRenderer.executeSteal('${targetPlayerId}', ${i}, '${cardIds[0]}')">
+                <span class="card-icon">🎴</span>
+                <span class="card-name">Lá #${i + 1}</span>
+            </div>
+        `).join('');
+
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box" style="max-width: 600px;">
+                    <div class="modal-title">🎁 Đang cướp bài của ${target.playerName}</div>
+                    <div class="modal-subtitle">Hãy chọn 1 lá bài đang úp để lấy đi.</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 20px 0;">
+                        ${cardsHtml}
+                    </div>
+                    <button class="btn btn-ghost" onclick="document.getElementById('card-modal-container').innerHTML=''">
+                        Huỷ
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    executeSteal(targetPlayerId, targetCardIndex, stealCardId) {
+        window.signalRService.sendGameAction('play_card', {
+            cardIds: [stealCardId],
+            targetPlayerId: targetPlayerId,
+            targetCardIndex: targetCardIndex
+        });
+        if (window.soundFX) window.soundFX.play('play');
+        this.selectedCardIds = [];
+        document.getElementById('card-modal-container').innerHTML = '';
     }
 
     showDiscardPileModal() {
