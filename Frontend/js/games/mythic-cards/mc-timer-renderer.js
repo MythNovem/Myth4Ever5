@@ -26,15 +26,21 @@ class MCTimerRenderer {
     }
 
     render(state, myId) {
+        if (!state) return;
         const bannerContainer = this._getBannerContainer();
         bannerContainer.innerHTML = '';
 
+        const isExploding = state.isExploding ?? state.IsExploding;
+        const explodeExpiryTime = state.explodeExpiryTime || state.ExplodeExpiryTime;
+        const explodingPlayerId = state.explodingPlayerId || state.ExplodingPlayerId;
+
         // 1. Exploding Bomb Timer (priority)
-        if (state.isExploding && state.explodeExpiryTime) {
-            const expiryTime = new Date(state.explodeExpiryTime).getTime();
+        if (isExploding && explodeExpiryTime) {
+            const expiryTime = new Date(explodeExpiryTime).getTime();
             if (expiryTime > Date.now()) {
-                const isMe  = state.explodingPlayerId === myId;
-                const pName = isMe ? 'BẠN' : (window.lobbyManager.currentRoom?.players.find(p => p.playerId === state.explodingPlayerId)?.playerName || 'Ai đó');
+                const isMe  = explodingPlayerId === myId;
+                const playerObj = window.lobbyManager?.currentRoom?.players?.find(p => p.playerId === explodingPlayerId);
+                const pName = isMe ? 'BẠN' : (playerObj?.playerName || 'Đối thủ');
 
                 const banner = document.createElement('div');
                 banner.className = 'action-banner exploding';
@@ -61,19 +67,23 @@ class MCTimerRenderer {
         }
 
         // 2. Nope Window Timer
-        if (state.currentPendingAction?.expiryTime) {
-            const expiryTime = new Date(state.currentPendingAction.expiryTime).getTime();
+        const pending = state.currentPendingAction || state.CurrentPendingAction;
+        const expiryStr = pending?.expiryTime || pending?.ExpiryTime;
+        if (pending && expiryStr) {
+            const expiryTime = new Date(expiryStr).getTime();
             if (expiryTime > Date.now()) {
-                const sourceId  = state.currentPendingAction.sourcePlayerId;
-                const pName     = sourceId === myId ? 'Bạn' : (window.lobbyManager.currentRoom?.players.find(p => p.playerId === sourceId)?.playerName || 'Người chơi');
-                const isNoped   = state.currentPendingAction.nopeCount % 2 !== 0;
+                const sourceId  = pending.sourcePlayerId || pending.SourcePlayerId;
+                const nopeCount = pending.nopeCount !== undefined ? pending.nopeCount : (pending.NopeCount ?? 0);
+                const playerObj = window.lobbyManager?.currentRoom?.players?.find(p => p.playerId === sourceId);
+                const pName     = sourceId === myId ? 'Bạn' : (playerObj?.playerName || 'Người chơi');
+                const isNoped   = nopeCount % 2 !== 0;
                 const barColor  = isNoped ? '#ef4444' : 'var(--gold-bright)';
 
                 const banner = document.createElement('div');
                 banner.className = 'action-banner';
                 banner.innerHTML = `
                     <div class="banner-title">⏱️ ${isNoped ? '🛑 ĐÃ BỊ CHẶN! 🛑' : 'ĐANG CHỜ PHẢN HỒI'}</div>
-                    <div class="banner-subtitle">${pName} vừa dùng bài. Còn vài giây để ném Chặn! (Nope: ${state.currentPendingAction.nopeCount})</div>
+                    <div class="banner-subtitle">${pName} vừa dùng bài. Còn vài giây để ném Chặn! (Nope: ${nopeCount})</div>
                     <div class="progress-container"><div class="progress-bar" id="nope-progress" style="width:100%; background:${barColor}"></div></div>
                 `;
                 bannerContainer.appendChild(banner);
@@ -91,7 +101,9 @@ class MCTimerRenderer {
                 this.activeTimers.push(id);
 
                 // Show Nope button if player has one
-                const nopeCard = (state.playerHands?.[myId] || []).find(c => c.type === 'Nope');
+                const playerHands = state.playerHands || state.PlayerHands || {};
+                const myHand = playerHands[myId] || [];
+                const nopeCard = myHand.find(c => c.type === 'Nope');
                 // Only non-source players can Nope
                 if (nopeCard && sourceId !== myId) {
                     const btnWrap = document.createElement('div');

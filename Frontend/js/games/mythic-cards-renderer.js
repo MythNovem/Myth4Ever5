@@ -156,34 +156,40 @@ class MythicCardsRenderer {
     }
 
     updateState(state) {
+        if (!state) return;
         this.gameState = state;
 
         if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
 
         // Deck & Discard counts
+        const deckCount      = state.deckCount ?? state.DeckCount;
+        const discardPile    = state.discardPile || state.DiscardPile || [];
+        const gameLogs       = state.gameLogs || state.GameLogs || [];
         const deckCountEl    = document.getElementById('deck-count');
         const discardCountEl = document.getElementById('discard-count');
         const discardTopEl   = document.getElementById('discard-top-icon');
 
-        if (deckCountEl)    deckCountEl.textContent = state.deckCount;
-        if (discardCountEl) discardCountEl.textContent = `${state.discardPile?.length ?? 0} lá`;
-        if (discardTopEl && state.discardPile?.length > 0) {
-            discardTopEl.textContent = state.discardPile[state.discardPile.length - 1].icon;
+        if (deckCountEl && deckCount !== undefined) deckCountEl.textContent = deckCount;
+        if (discardCountEl) discardCountEl.textContent = `${discardPile.length} lá`;
+        if (discardTopEl && discardPile.length > 0) {
+            discardTopEl.textContent = discardPile[discardPile.length - 1].icon;
         }
-
-        // Seats
-        const room = window.lobbyManager.currentRoom;
-        if (!room) return;
 
         const myId = window.signalRService.getPlayerId();
-        const myIndex = room.players.findIndex(p => p.playerId === myId);
-        const otherPlayers = [];
-        for (let i = 1; i < room.players.length; i++) {
-            otherPlayers.push(room.players[(myIndex + i) % room.players.length]);
-        }
+        const room = window.lobbyManager.currentRoom;
 
-        if (window.mcSeatRenderer) {
-            window.mcSeatRenderer.renderDynamicSeats(room.players[myIndex], otherPlayers, state);
+        // Render seats only if room data is available
+        if (room && room.players) {
+            const myIndex = room.players.findIndex(p => p.playerId === myId);
+            if (myIndex >= 0) {
+                const otherPlayers = [];
+                for (let i = 1; i < room.players.length; i++) {
+                    otherPlayers.push(room.players[(myIndex + i) % room.players.length]);
+                }
+                if (window.mcSeatRenderer) {
+                    window.mcSeatRenderer.renderDynamicSeats(room.players[myIndex], otherPlayers, state);
+                }
+            }
         }
 
         // Hand
@@ -193,12 +199,12 @@ class MythicCardsRenderer {
 
         // Game logs
         const logsBox = document.getElementById('game-logs-box');
-        if (logsBox && state.gameLogs) {
-            logsBox.innerHTML = state.gameLogs.map(log => `<div class="log-line">${log}</div>`).join('');
+        if (logsBox && gameLogs) {
+            logsBox.innerHTML = gameLogs.map(log => `<div class="log-line">${log}</div>`).join('');
             logsBox.scrollTop = logsBox.scrollHeight;
         }
 
-        // Timers & Favor
+        // Timers & Favor (Always runs for ALL clients, host & guest!)
         if (window.mcTimerRenderer) window.mcTimerRenderer.render(state, myId);
         if (window.mcModalManager) window.mcModalManager.showFavorModal(state, myId);
     }
