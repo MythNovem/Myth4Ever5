@@ -39,6 +39,14 @@ public class MythicCardsEngine : IGameEngine
             actionCards.Add(new CardModel { Type = CardType.Normal5, Name = "Golem Đá", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🪨", Color = "#78716c" });
         }
 
+        // Thêm các Bài Phép Mở Rộng
+        for (int i = 0; i < 4; i++)
+        {
+            actionCards.Add(new CardModel { Type = CardType.AlterFuture, Name = "Đổi Tương Lai", Description = "Xem và tự do sắp xếp lại 3 lá đầu tiên", Icon = "🔮", Color = "#c084fc" });
+            actionCards.Add(new CardModel { Type = CardType.DrawBottom, Name = "Rút Đáy", Description = "Kết thúc lượt bằng cách rút lá dưới cùng", Icon = "⚓", Color = "#0284c7" });
+            actionCards.Add(new CardModel { Type = CardType.TargetedAttack, Name = "Ám Sát", Description = "Ép một người bất kỳ đi 2 lượt liên tiếp", Icon = "🎯", Color = "#be123c" });
+        }
+
         // Xáo trộn các lá Action để chia
         ShuffleList(actionCards);
 
@@ -60,7 +68,7 @@ public class MythicCardsEngine : IGameEngine
                 }
             }
 
-            state.PlayerHands[player.ConnectionId] = hand;
+            state.PlayerHands[player.PlayerId] = hand;
         }
 
         // 3. Đưa Bẫy Nổ (PlayerCount - 1 = 2) và các lá Defuse còn lại vào Deck chung
@@ -93,8 +101,13 @@ public class MythicCardsEngine : IGameEngine
             return Task.FromResult(new GameActionResult { Success = false, Message = "Game state không hợp lệ" });
         }
 
+        if (!state.PlayerHands.TryGetValue(playerId, out var myHand))
+        {
+            return Task.FromResult(new GameActionResult { Success = false, Message = "Không tìm thấy tay bài của bạn" });
+        }
+
         var currentPlayer = room.Players[state.CurrentTurnIndex];
-        if (currentPlayer.ConnectionId != playerId && actionType != "insert_trap")
+        if (currentPlayer.PlayerId != playerId && actionType != "insert_trap")
         {
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
         }
@@ -114,6 +127,9 @@ public class MythicCardsEngine : IGameEngine
 
             case "insert_trap":
                 return Task.FromResult(HandleInsertTrap(room, state, playerId, payload));
+
+            case "rearrange_future":
+                return Task.FromResult(HandleRearrangeFuture(room, state, playerId, payload));
 
             default:
                 return Task.FromResult(new GameActionResult { Success = false, Message = "Hành động không hợp lệ" });
@@ -165,7 +181,7 @@ public class MythicCardsEngine : IGameEngine
             hand.Remove(card);
             state.DiscardPile.Add(card);
 
-            string playerMsg = $"{room.Players.First(p => p.ConnectionId == playerId).PlayerName} đã đánh lá [{card.Name}] {card.Icon}";
+            string playerMsg = $"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã đánh lá [{card.Name}] {card.Icon}";
             state.GameLogs.Add(playerMsg);
 
             return ExecuteSingleCardEffect(room, state, playerId, card, payload);
@@ -219,16 +235,46 @@ public class MythicCardsEngine : IGameEngine
                     targetId = targetProp.GetString() ?? "";
                 }
 
-                var aliveTargets = room.Players.Where(p => p.ConnectionId != playerId && p.IsAlive && state.PlayerHands[p.ConnectionId].Count > 0).ToList();
+                var aliveTargets = room.Players.Where(p => p.PlayerId != playerId && p.IsAlive && state.PlayerHands[p.PlayerId].Count > 0).ToList();
                 if (aliveTargets.Count > 0)
                 {
-                    var target = aliveTargets.FirstOrDefault(p => p.ConnectionId == targetId) ?? aliveTargets[_random.Next(aliveTargets.Count)];
-                    var targetHand = state.PlayerHands[target.ConnectionId];
+                    var target = aliveTargets.FirstOrDefault(p => p.PlayerId == targetId) ?? aliveTargets[_random.Next(aliveTargets.Count)];
+                    var targetHand = state.PlayerHands[target.PlayerId];
                     var stolenCard = targetHand[_random.Next(targetHand.Count)];
                     targetHand.Remove(stolenCard);
                     hand.Add(stolenCard);
-                    state.GameLogs.Add($"{room.Players.First(p => p.ConnectionId == playerId).PlayerName} đã cướp 1 lá bài của {target.PlayerName}!");
+                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã cướp 1 lá bài của {target.PlayerName}!");
                 }
+                break;
+            case CardType.TargetedAttack:
+                string taTargetId = payload.TryGetProperty("targetPlayerId", out var taProp) ? taProp.GetString() ?? "" : "";
+                var taTargetIndex = room.Players.FindIndex(p => p.PlayerId == taTargetId && p.IsAlive);
+                if (taTargetIndex >= 0)
+                {
+                    state.CurrentTurnIndex = taTargetIndex;
+                    state.TurnsToTake = 2;
+                    state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã 🎯 Ám Sát {room.Players[taTargetIndex].PlayerName}, bắt phải đi 2 lượt!");
+                }
+                else
+                {
+                    AdvanceTurn(room, state);
+                    state.TurnsToTake = 2;
+                }
+                break;
+
+            case CardType.DrawBottom:
+                if (state.Deck.Count > 0)
+                {
+                    var bottomCard = state.Deck.Last();
+                    state.Deck.RemoveAt(state.Deck.Count - 1);
+                    var player = room.Players.First(p => p.PlayerId == playerId);
+                    return ProcessDrawnCard(room, state, playerId, bottomCard, player, hand, isFromBottom: true);
+                }
+                break;
+
+            case CardType.AlterFuture:
+                var top3Alter = state.Deck.Take(3).ToList();
+                extraData = new { FutureCards = top3Alter, IsAlter = true };
                 break;
         }
 
@@ -245,7 +291,7 @@ public class MythicCardsEngine : IGameEngine
     {
         int count = cardsToPlay.Count;
         var hand = state.PlayerHands[playerId];
-        var player = room.Players.First(p => p.ConnectionId == playerId);
+        var player = room.Players.First(p => p.PlayerId == playerId);
         
         bool isPair = count == 2 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
         bool isThree = count == 3 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
@@ -266,13 +312,13 @@ public class MythicCardsEngine : IGameEngine
                 targetId = targetProp.GetString() ?? "";
             }
 
-            var target = room.Players.FirstOrDefault(p => p.ConnectionId == targetId && p.IsAlive && p.ConnectionId != playerId);
+            var target = room.Players.FirstOrDefault(p => p.PlayerId == targetId && p.IsAlive && p.PlayerId != playerId);
             if (target == null)
             {
                 return new GameActionResult { Success = false, Message = "Mục tiêu không hợp lệ hoặc đã bị loại!" };
             }
 
-            var targetHand = state.PlayerHands[target.ConnectionId];
+            var targetHand = state.PlayerHands[target.PlayerId];
 
             if (isPair)
             {
@@ -364,9 +410,14 @@ public class MythicCardsEngine : IGameEngine
         var drawnCard = state.Deck[0];
         state.Deck.RemoveAt(0);
 
-        var player = room.Players.First(p => p.ConnectionId == playerId);
+        var player = room.Players.First(p => p.PlayerId == playerId);
         var hand = state.PlayerHands[playerId];
 
+        return ProcessDrawnCard(room, state, playerId, drawnCard, player, hand, isFromBottom: false);
+    }
+
+    private GameActionResult ProcessDrawnCard(RoomModel room, MythicCardsState state, string playerId, CardModel drawnCard, PlayerModel player, List<CardModel> hand, bool isFromBottom)
+    {
         if (drawnCard.Type == CardType.ExplodingTrap)
         {
             // Kiểm tra xem có Defuse không
@@ -377,7 +428,7 @@ public class MythicCardsEngine : IGameEngine
                 state.DiscardPile.Add(defuseCard);
                 state.AwaitingDefusePlacement = true;
                 state.PendingDefusePlayerId = playerId;
-                state.GameLogs.Add($"💣 {player.PlayerName} rút phải BẪY NỔ! Nhưng đã dùng 🛡️ Gỡ Bẫy cứu mạng!");
+                state.GameLogs.Add($"💣 {player.PlayerName} rút phải BẪY NỔ {(isFromBottom ? "từ dưới đáy" : "")}! Nhưng đã dùng 🛡️ Gỡ Bẫy cứu mạng!");
 
                 return new GameActionResult
                 {
@@ -397,7 +448,7 @@ public class MythicCardsEngine : IGameEngine
                 // Bị nổ loại khỏi cuộc chơi
                 player.IsAlive = false;
                 state.DiscardPile.Add(drawnCard);
-                state.GameLogs.Add($"💥 BOOM! {player.PlayerName} rút phải BẪY NỔ và đã BỊ LOẠI khỏi cuộc chơi!");
+                state.GameLogs.Add($"💥 BOOM! {player.PlayerName} rút phải BẪY NỔ {(isFromBottom ? "từ dưới đáy" : "")} và đã BỊ LOẠI khỏi cuộc chơi!");
 
                 var alivePlayers = room.Players.Where(p => p.IsAlive).ToList();
                 if (alivePlayers.Count <= 1)
@@ -408,11 +459,11 @@ public class MythicCardsEngine : IGameEngine
                         Success = true,
                         ActionType = "player_exploded",
                         IsGameOver = true,
-                        WinnerId = winner?.ConnectionId,
+                        WinnerId = winner?.PlayerId,
                         WinnerName = winner?.PlayerName,
                         Data = new
                         {
-                            PlayerId = playerId,
+                            explodedPlayerId = player.PlayerId,
                             PlayerName = player.PlayerName,
                             RoomState = SanitizeStateForBroadcast(room, state)
                         }
@@ -426,7 +477,7 @@ public class MythicCardsEngine : IGameEngine
                     ActionType = "player_exploded",
                     Data = new
                     {
-                        PlayerId = playerId,
+                        explodedPlayerId = player.PlayerId,
                         PlayerName = player.PlayerName,
                         RoomState = SanitizeStateForBroadcast(room, state)
                     }
@@ -436,7 +487,7 @@ public class MythicCardsEngine : IGameEngine
         else
         {
             hand.Add(drawnCard);
-            state.GameLogs.Add($"{player.PlayerName} đã rút 1 lá bài.");
+            state.GameLogs.Add($"{player.PlayerName} đã rút 1 lá bài {(isFromBottom ? "từ dưới đáy" : "")}.");
             state.TurnsToTake--;
 
             if (state.TurnsToTake <= 0)
@@ -471,15 +522,20 @@ public class MythicCardsEngine : IGameEngine
             insertIndex = idxProp.GetInt32();
         }
 
-        insertIndex = Math.Clamp(insertIndex, 0, state.Deck.Count);
-
-        var trapCard = new CardModel { Type = CardType.ExplodingTrap, Name = "Bẫy Nổ", Description = "Nổ tung và loại người chơi khỏi bàn!", Icon = "💣", Color = "#dc2626" };
-        state.Deck.Insert(insertIndex, trapCard);
-
+        var insertCard = state.DiscardPile.FirstOrDefault(c => c.Type == CardType.ExplodingTrap) 
+                         ?? new CardModel { Type = CardType.ExplodingTrap, Name = "Bẫy Nổ", Description = "Rút phải là TOANG!", Icon = "💣", Color = "#ef4444" };
+        
+        state.DiscardPile.Remove(insertCard);
+        
+        if (insertIndex > state.Deck.Count) insertIndex = state.Deck.Count;
+        if (insertIndex < 0) insertIndex = 0;
+        
+        state.Deck.Insert(insertIndex, insertCard);
+        
         state.AwaitingDefusePlacement = false;
         state.PendingDefusePlayerId = null;
 
-        var player = room.Players.First(p => p.ConnectionId == playerId);
+        var player = room.Players.First(p => p.PlayerId == playerId);
         state.GameLogs.Add($"🛡️ {player.PlayerName} đã giấu lại Bẫy Nổ vào bộ bài!");
 
         state.TurnsToTake--;
@@ -496,6 +552,50 @@ public class MythicCardsEngine : IGameEngine
             {
                 PlayerId = playerId,
                 InsertIndex = insertIndex,
+                RoomState = SanitizeStateForBroadcast(room, state)
+            }
+        };
+    }
+
+    private GameActionResult HandleRearrangeFuture(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
+    {
+        if (!payload.TryGetProperty("newOrderIds", out var newOrderProp))
+        {
+            return new GameActionResult { Success = false, Message = "Thiếu newOrderIds" };
+        }
+
+        var newOrderIds = newOrderProp.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+        if (newOrderIds.Count != Math.Min(3, state.Deck.Count))
+        {
+            return new GameActionResult { Success = false, Message = "Số lượng bài sắp xếp không hợp lệ" };
+        }
+
+        var topCards = state.Deck.Take(newOrderIds.Count).ToList();
+        var newTopCards = new List<CardModel>();
+
+        foreach (var id in newOrderIds)
+        {
+            var card = topCards.FirstOrDefault(c => c.Id == id);
+            if (card == null) return new GameActionResult { Success = false, Message = "Có ID không nằm trong top 3" };
+            newTopCards.Add(card);
+        }
+
+        // Replace the top cards in the deck
+        for (int i = 0; i < newTopCards.Count; i++)
+        {
+            state.Deck[i] = newTopCards[i];
+        }
+
+        var player = room.Players.First(p => p.PlayerId == playerId);
+        state.GameLogs.Add($"🔮 {player.PlayerName} đã dùng phép Đổi Tương Lai thay đổi trật tự bộ bài!");
+
+        return new GameActionResult
+        {
+            Success = true,
+            ActionType = "future_rearranged",
+            Data = new
+            {
+                PlayerId = playerId,
                 RoomState = SanitizeStateForBroadcast(room, state)
             }
         };
@@ -525,7 +625,7 @@ public class MythicCardsEngine : IGameEngine
                 Success = true,
                 ActionType = actionType,
                 IsGameOver = true,
-                WinnerId = winner?.ConnectionId,
+                WinnerId = winner?.PlayerId,
                 WinnerName = winner?.PlayerName,
                 Data = data
             };
@@ -539,8 +639,10 @@ public class MythicCardsEngine : IGameEngine
         };
     }
 
-    private object SanitizeStateForBroadcast(RoomModel room, MythicCardsState state)
+    public object SanitizeStateForBroadcast(RoomModel room, object genericState)
     {
+        var state = genericState as MythicCardsState;
+        if (state == null) return new { };
         return new
         {
             DeckCount = state.Deck.Count,

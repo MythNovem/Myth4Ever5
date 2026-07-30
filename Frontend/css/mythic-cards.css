@@ -21,7 +21,9 @@
     position: relative;
     width: 100%;
     max-width: 960px;
-    height: 460px;
+    flex: 1;
+    min-height: 200px;
+    max-height: 460px;
     border-radius: 50%;
     background:
         radial-gradient(ellipse at center, #18142e 30%, #0d0b17 75%, #08070d),
@@ -265,7 +267,7 @@
     padding: 12px 24px;
     background: var(--surface-0);
     border-top: 1px solid var(--border-dim);
-    min-height: 180px;
+    min-height: 140px;
 }
 
 .hand-label {
@@ -414,6 +416,19 @@
 .card--normal1 .card-name, .card--normal2 .card-name, .card--normal3 .card-name, .card--normal4 .card-name, .card--normal5 .card-name {
     color: #d6d3d1;
 }
+
+/* Expansion Cards */
+.card--alterfuture    { border-color: rgba(192, 132, 252, 0.4); }
+.card--alterfuture:hover { border-color: #c084fc; box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 16px rgba(192,132,252,0.35); }
+.card--alterfuture .card-name { color: #d8b4fe; }
+
+.card--drawbottom      { border-color: rgba(2, 132, 199, 0.4); }
+.card--drawbottom:hover { border-color: #0ea5e9; box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 16px rgba(2,132,199,0.35); }
+.card--drawbottom .card-name { color: #38bdf8; }
+
+.card--targetedattack  { border-color: rgba(190, 18, 60, 0.4); }
+.card--targetedattack:hover { border-color: #e11d48; box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 16px rgba(190,18,60,0.35); }
+.card--targetedattack .card-name { color: #fb7185; }
 
 /* ============================================
    GAME LOGS

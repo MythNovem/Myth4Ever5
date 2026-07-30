@@ -2,6 +2,16 @@ class SignalRService {
     constructor() {
         this.connection = null;
         this.listeners = {};
+        this.playerId = this.getOrCreatePlayerId();
+    }
+
+    getOrCreatePlayerId() {
+        let id = localStorage.getItem('myth_player_id');
+        if (!id) {
+            id = crypto.randomUUID ? crypto.randomUUID() : 'p_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('myth_player_id', id);
+        }
+        return id;
     }
 
     async init(hubUrl = 'http://localhost:5000/hubs/party') {
@@ -55,11 +65,19 @@ class SignalRService {
     }
 
     async createRoom(playerName, avatarUrl) {
-        return this.connection.invoke('CreateRoom', playerName, avatarUrl);
+        return this.connection.invoke('CreateRoom', this.playerId, playerName, avatarUrl);
     }
 
     async joinRoom(roomCode, playerName, avatarUrl) {
-        return this.connection.invoke('JoinRoom', roomCode, playerName, avatarUrl);
+        return this.connection.invoke('JoinRoom', roomCode, this.playerId, playerName, avatarUrl);
+    }
+
+    async rejoinRoom(roomCode) {
+        return this.connection.invoke('RejoinRoom', roomCode, this.playerId);
+    }
+
+    async leaveRoomExplicit() {
+        return this.connection.invoke('LeaveRoomExplicit', this.playerId);
     }
 
     async startGame() {
@@ -80,6 +98,10 @@ class SignalRService {
 
     getConnectionId() {
         return this.connection ? this.connection.connectionId : null;
+    }
+
+    getPlayerId() {
+        return this.playerId;
     }
 }
 

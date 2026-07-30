@@ -85,6 +85,17 @@ class MythicCardsRenderer {
                             <li style="margin-bottom: 6px;"><b>Nhìn Tương Lai (👁️):</b> Xem bí mật 3 lá trên cùng của xấp bài rút.</li>
                             <li style="margin-bottom: 6px;"><b>Xáo Bài (🔀):</b> Xáo trộn lại xấp bài rút.</li>
                             <li style="margin-bottom: 6px;"><b>Cướp Bài (🎁):</b> Lấy ngẫu nhiên 1 lá bài từ đối thủ.</li>
+                            <li style="margin-bottom: 6px;"><b>Đổi Tương Lai (🔮):</b> Xem 3 lá trên cùng và <b>sắp xếp lại</b> thứ tự.</li>
+                            <li style="margin-bottom: 6px;"><b>Rút Đáy (⚓):</b> Kết thúc lượt bằng cách <b>rút lá dưới cùng</b> của bộ bài.</li>
+                            <li style="margin-bottom: 6px;"><b>Ám Sát (🎯):</b> Chấm dứt lượt của bạn và ép <b>một người chơi bất kỳ phải đi 2 lượt</b> liên tiếp.</li>
+                        </ul>
+                        
+                        <div style="font-weight: bold; color: var(--gold-bright); margin: 16px 0 8px;">🎮 LUẬT COMBO BÀI THƯỜNG</div>
+                        <p style="margin-bottom: 8px;">Bài thường (Cáo, Rồng, Sói, Tinh Linh, Golem) không có tác dụng khi đánh lẻ. Phải đánh theo bộ (Combo):</p>
+                        <ul style="margin-left: 16px; margin-bottom: 12px;">
+                            <li style="margin-bottom: 6px;"><b>Đôi (2 lá giống nhau):</b> Chọn 1 người chơi để <b>cướp ngẫu nhiên</b> 1 lá bài từ tay họ.</li>
+                            <li style="margin-bottom: 6px;"><b>Ba (3 lá giống nhau):</b> Chọn 1 người chơi và <b>đòi đích danh 1 lá bài cụ thể</b>. Nếu họ có, họ buộc phải đưa cho bạn. Nếu không có, bạn mất trắng 3 lá!</li>
+                            <li style="margin-bottom: 6px;"><b>Năm (5 lá khác nhau hoàn toàn):</b> Kích hoạt kỹ năng <b>Bới Rác</b>. Chọn 1 lá bất kỳ trong Chồng Bài Bỏ để lấy lại vào tay.</li>
                         </ul>
                         <div style="text-align:center;"><i>Càng về cuối, tỉ lệ bốc trúng bẫy càng cao! Chúc bạn may mắn.</i></div>
                     </div>
@@ -107,7 +118,19 @@ class MythicCardsRenderer {
         if (actionType === 'card_played' && data.extraData?.futureCards) {
             const myId = window.signalRService.getConnectionId();
             if (data.playerId === myId) {
-                this.showFutureModal(data.extraData.futureCards);
+                if (data.extraData.isAlter) {
+                    this.showAlterFutureModal(data.extraData.futureCards);
+                } else {
+                    this.showFutureModal(data.extraData.futureCards);
+                }
+            }
+        }
+        
+        if (actionType === 'future_rearranged') {
+            const myId = window.signalRService.getConnectionId();
+            if (data.playerId === myId) {
+                window.lobbyManager.showToast('Bạn đã thay đổi tương lai thành công!', 'success');
+                document.getElementById('card-modal-container').innerHTML = '';
             }
         }
 
@@ -319,6 +342,10 @@ class MythicCardsRenderer {
                 this.showTargetPlayerModal(this.selectedCardIds, "Chọn mục tiêu cướp bài");
                 return;
             }
+            if (card.type === 'TargetedAttack') {
+                this.showTargetPlayerModal(this.selectedCardIds, "🎯 Ám Sát: Chọn mục tiêu để Ép đi 2 lượt");
+                return;
+            }
             // Just normal single card
             window.signalRService.sendGameAction('play_card', { cardIds: this.selectedCardIds });
             this.selectedCardIds = [];
@@ -346,6 +373,53 @@ class MythicCardsRenderer {
         } else {
             window.lobbyManager.showToast(`Không có combo cho ${count} lá bài!`, 'danger');
         }
+    }
+
+    showAlterFutureModal(top3Cards) {
+        this.currentFutureCards = top3Cards.map(c => ({...c}));
+        this.renderAlterFutureModal();
+    }
+
+    renderAlterFutureModal() {
+        const top3Cards = this.currentFutureCards;
+        document.getElementById('card-modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal-box">
+                    <div class="modal-title">🔮 Đổi Tương Lai</div>
+                    <div class="modal-subtitle">Sắp xếp lại 3 lá bài. Lá #1 sẽ được rút tiếp theo.</div>
+                    <div class="future-cards-row" style="display: flex; gap: 8px; justify-content: center; margin: 16px 0;">
+                        ${top3Cards.map((c, i) => `
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <div class="game-card card--${c.type.toLowerCase()}" style="cursor:default; margin:0;">
+                                    <span class="card-type-label">#${i + 1}</span>
+                                    <span class="card-icon">${c.icon}</span>
+                                    <span class="card-name">${c.name}</span>
+                                </div>
+                                <div style="display: flex; gap: 4px;">
+                                    <button class="btn btn-ghost" style="padding: 4px 8px; min-width: unset;" ${i===0?'disabled':''} onclick="window.mythicCardsRenderer.swapFutureCards(${i}, ${i-1})">⬅️</button>
+                                    <button class="btn btn-ghost" style="padding: 4px 8px; min-width: unset;" ${i===top3Cards.length-1?'disabled':''} onclick="window.mythicCardsRenderer.swapFutureCards(${i}, ${i+1})">➡️</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-primary" onclick="window.mythicCardsRenderer.saveFutureOrder()" style="width: 100%;">
+                        Lưu Thứ Tự
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    swapFutureCards(idxA, idxB) {
+        const temp = this.currentFutureCards[idxA];
+        this.currentFutureCards[idxA] = this.currentFutureCards[idxB];
+        this.currentFutureCards[idxB] = temp;
+        this.renderAlterFutureModal();
+    }
+
+    saveFutureOrder() {
+        const newOrderIds = this.currentFutureCards.map(c => c.id);
+        window.signalRService.sendGameAction('rearrange_future', { newOrderIds });
     }
 
     showFutureModal(top3Cards) {

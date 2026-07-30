@@ -18,6 +18,9 @@
             <span class="logo-sub">Party Lounge</span>
         </div>
         <div class="status-dot" id="connection-status">Đang kết nối...</div>
+        <button id="btn-leave-room" class="btn btn-ghost" style="display: none; padding: 4px 12px; font-size: 12px; border-color: var(--crimson); color: var(--crimson-bright); margin-left: auto;">
+            🔙 Rời Phòng
+        </button>
     </header>
 
     <!-- ===== MAIN ===== -->
@@ -153,7 +156,7 @@
             });
 
             // Kết nối SignalR C# Backend
-            const connected = await window.signalRService.init('http://localhost:5000/hubs/party');
+            const connected = await window.signalRService.init('/hubs/party');
             const statusEl = document.getElementById('connection-status');
 
             if (connected) {
@@ -166,7 +169,18 @@
                 window.signalRService.on('GameOver',            (wId, wName, sum) => window.gameLoader.handleGameOver(wId, wName, sum));
                 window.signalRService.on('ReceiveChatMessage',  (sId, sName, sAv, msg, time) => window.lobbyManager.appendChatMessage(sName, sAv, msg, time));
                 window.signalRService.on('ReceiveEmojiReaction',(sId, sName, emoji) => window.lobbyManager.spawnFloatingEmoji(emoji, sName));
-                window.signalRService.on('ErrorNotification',   (err) => window.lobbyManager.showToast(err, 'danger'));
+                window.signalRService.on('ErrorNotification',   (err) => {
+                    window.lobbyManager.showToast(err, 'danger');
+                    if (err === "Không tìm thấy phòng chơi!" || err === "Bạn không thuộc phòng này!") {
+                        window.lobbyManager.clearRoomState();
+                    }
+                });
+
+                // Tự động vào lại phòng nếu F5
+                const savedRoom = localStorage.getItem('myth_room_code');
+                if (savedRoom) {
+                    window.signalRService.rejoinRoom(savedRoom);
+                }
             } else {
                 statusEl.textContent = 'Offline — Không kết nối được Server';
                 statusEl.style.color = 'var(--crimson-bright)';

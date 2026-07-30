@@ -58,6 +58,28 @@ class LobbyManager {
                 if (emoji) window.signalRService.sendEmojiReaction(emoji);
             });
         });
+
+        // Leave Room Button
+        document.getElementById('btn-leave-room')?.addEventListener('click', async () => {
+            if (confirm("Bạn có chắc chắn muốn rời phòng?")) {
+                await window.signalRService.leaveRoomExplicit();
+                this.clearRoomState();
+            }
+        });
+    }
+
+    clearRoomState() {
+        this.currentRoom = null;
+        localStorage.removeItem('myth_room_code');
+        document.getElementById('btn-leave-room').style.display = 'none';
+        
+        // Hide all screens, show lobby
+        document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
+        document.getElementById('lobby-view').style.display = 'flex';
+        
+        // Reset game container
+        const gc = document.getElementById('game-container');
+        if (gc) gc.innerHTML = '';
     }
 
     sendChat() {
@@ -71,14 +93,19 @@ class LobbyManager {
 
     renderRoomState(room) {
         this.currentRoom = room;
+        localStorage.setItem('myth_room_code', room.roomCode);
+        
         document.getElementById('display-room-code').innerText = room.roomCode;
+        
+        // Show Leave button
+        document.getElementById('btn-leave-room').style.display = 'block';
         
         // Show Room view, hide Lobby view
         document.getElementById('lobby-view').style.display = 'none';
         document.getElementById('room-view').style.display = 'block';
 
-        const myConnectionId = window.signalRService.getConnectionId();
-        const isHost = room.hostConnectionId === myConnectionId;
+        const myPlayerId = window.signalRService.getPlayerId();
+        const isHost = room.hostConnectionId === room.players.find(p => p.playerId === myPlayerId)?.connectionId;
 
         const startBtn = document.getElementById('btn-start-game');
         if (startBtn) {
@@ -89,16 +116,17 @@ class LobbyManager {
                 : `🎮 Bắt Đầu Game (${room.players.length} người)`;
         }
 
-        // Render player list in room lobby
         const playerListContainer = document.getElementById('room-player-list');
         if (playerListContainer) {
             playerListContainer.innerHTML = room.players.map(p => {
-                const isMe = p.connectionId === myConnectionId;
+                const isMe = p.playerId === myPlayerId;
+                const offlineStyle = p.isConnected ? '' : 'opacity: 0.5; filter: grayscale(1);';
+                const offlineText = p.isConnected ? '' : ' <span style="color:var(--crimson-bright); font-size:10px;">(Offline)</span>';
                 return `
-                <div class="player-row">
+                <div class="player-row" style="${offlineStyle}">
                     <div class="player-avatar">${p.avatarUrl}</div>
                     <div class="player-info">
-                        <div class="player-name-text">${p.playerName}</div>
+                        <div class="player-name-text">${p.playerName}${offlineText}</div>
                         <div class="player-badge">
                             ${p.isHost ? '<span class="crown-badge">👑 Chủ phòng</span>' : ''}
                             ${isMe ? '<span style="font-size:11px; color:var(--text-muted);"> · Bạn</span>' : ''}

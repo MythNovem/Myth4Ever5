@@ -9,15 +9,17 @@ public class RoomManager
     private readonly ConcurrentDictionary<string, string> _playerToRoom = new();
     private readonly Random _random = new();
 
-    public RoomModel CreateRoom(string hostConnectionId, string hostPlayerName, string hostAvatarUrl)
+    public RoomModel CreateRoom(string playerId, string hostConnectionId, string hostPlayerName, string hostAvatarUrl)
     {
         string roomCode = GenerateUniqueRoomCode();
         var hostPlayer = new PlayerModel
         {
+            PlayerId = playerId,
             ConnectionId = hostConnectionId,
             PlayerName = hostPlayerName,
             AvatarUrl = hostAvatarUrl,
-            IsHost = true
+            IsHost = true,
+            IsConnected = true
         };
 
         var room = new RoomModel
@@ -29,11 +31,11 @@ public class RoomManager
         };
 
         _rooms[roomCode] = room;
-        _playerToRoom[hostConnectionId] = roomCode;
+        _playerToRoom[playerId] = roomCode;
         return room;
     }
 
-    public (bool Success, string Message, RoomModel? Room) JoinRoom(string roomCode, string connectionId, string playerName, string avatarUrl)
+    public (bool Success, string Message, RoomModel? Room) JoinRoom(string roomCode, string playerId, string connectionId, string playerName, string avatarUrl)
     {
         roomCode = roomCode.Trim().ToUpper();
         if (!_rooms.TryGetValue(roomCode, out var room))
@@ -51,29 +53,51 @@ public class RoomManager
             return (false, "Phòng đã đầy (tối đa 4 người)!", null);
         }
 
-        var existingPlayer = room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+        var existingPlayer = room.Players.FirstOrDefault(p => p.PlayerId == playerId);
         if (existingPlayer == null)
         {
             var newPlayer = new PlayerModel
             {
+                PlayerId = playerId,
                 ConnectionId = connectionId,
                 PlayerName = playerName,
                 AvatarUrl = avatarUrl,
-                IsHost = false
+                IsHost = false,
+                IsConnected = true
             };
 
             room.Players.Add(newPlayer);
-            _playerToRoom[connectionId] = roomCode;
+            _playerToRoom[playerId] = roomCode;
+        }
+        else
+        {
+            existingPlayer.ConnectionId = connectionId;
+            existingPlayer.PlayerName = playerName; // Update name/avatar on rejoin if changed
+            existingPlayer.AvatarUrl = avatarUrl;
+            existingPlayer.IsConnected = true;
         }
 
         return (true, "Vào phòng thành công", room);
     }
 
-    public (RoomModel? Room, PlayerModel? LeftPlayer) LeaveRoom(string connectionId)
+    public void HandleDisconnect(string connectionId)
     {
-        if (_playerToRoom.TryRemove(connectionId, out var roomCode) && _rooms.TryGetValue(roomCode, out var room))
+        var room = GetRoomByConnectionId(connectionId);
+        if (room != null)
         {
             var player = room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+            if (player != null)
+            {
+                player.IsConnected = false;
+            }
+        }
+    }
+
+    public (RoomModel? Room, PlayerModel? LeftPlayer) LeaveRoomExplicit(string playerId)
+    {
+        if (_playerToRoom.TryRemove(playerId, out var roomCode) && _rooms.TryGetValue(roomCode, out var room))
+        {
+            var player = room.Players.FirstOrDefault(p => p.PlayerId == playerId);
             if (player != null)
             {
                 room.Players.Remove(player);
@@ -105,7 +129,12 @@ public class RoomManager
 
     public RoomModel? GetRoomByConnectionId(string connectionId)
     {
-        if (_playerToRoom.TryGetValue(connectionId, out var roomCode))
+        return _rooms.Values.FirstOrDefault(r => r.Players.Any(p => p.ConnectionId == connectionId));
+    }
+
+    public RoomModel? GetRoomByPlayerId(string playerId)
+    {
+        if (_playerToRoom.TryGetValue(playerId, out var roomCode))
         {
             return GetRoom(roomCode);
         }

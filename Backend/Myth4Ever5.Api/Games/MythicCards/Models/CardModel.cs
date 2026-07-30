@@ -16,7 +16,10 @@ public enum CardType
     Normal2,       // Rồng Con
     Normal3,       // Sói Băng
     Normal4,       // Tinh Linh
-    Normal5        // Golem Đá
+    Normal5,       // Golem Đá
+    AlterFuture,   // Đổi Tương Lai
+    DrawBottom,    // Rút Đáy
+    TargetedAttack // Ép Lượt Chỉ Định
 }
 
 public class CardModel

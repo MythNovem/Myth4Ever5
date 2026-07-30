@@ -95,8 +95,8 @@ body {
         radial-gradient(ellipse 80% 50% at 20% -10%, rgba(91, 63, 168, 0.18) 0%, transparent 60%),
         radial-gradient(ellipse 60% 40% at 80% 100%, rgba(192, 83, 138, 0.10) 0%, transparent 55%),
         radial-gradient(ellipse 40% 60% at 50% 50%, rgba(19, 17, 31, 0.95) 0%, transparent 100%);
-    min-height: 100vh;
-    overflow-x: hidden;
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     user-select: none;
