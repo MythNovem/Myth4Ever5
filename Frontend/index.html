@@ -155,8 +155,13 @@
                 window.lobbyManager.showToast('Đã sao chép mã phòng!', 'success');
             });
 
-            // Kết nối SignalR C# Backend
-            const connected = await window.signalRService.init('/hubs/party');
+            // Kết nối SignalR C# Backend (Hỗ trợ cả môi trường Dev ở máy và Deploy)
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const backendUrl = isLocal 
+                ? 'http://localhost:5000/hubs/party' 
+                : 'https://myth4ever5-backend.onrender.com/hubs/party';
+
+            const connected = await window.signalRService.init(backendUrl);
             const statusEl = document.getElementById('connection-status');
 
             if (connected) {
