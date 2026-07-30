@@ -13,10 +13,18 @@ public class MythicCardsDeckBuilder
 
     public void Initialize(RoomModel room, MythicCardsState state)
     {
+        int playerCount = Math.Max(2, Math.Min(4, room.Players.Count));
         var actionCards = new List<CardModel>();
 
-        // Action cards (5 each)
-        for (int i = 0; i < 5; i++)
+        // Dynamic card scaling based on player count
+        int actionCopies    = playerCount == 2 ? 3 : 5;
+        int normalCopies    = playerCount == 2 ? 5 : 8;
+        int expansionCopies = playerCount == 2 ? 2 : 3;
+        int nopeCopies      = playerCount == 2 ? 3 : 5;
+        int favorCopies     = playerCount == 2 ? 3 : 4;
+
+        // Action cards
+        for (int i = 0; i < actionCopies; i++)
         {
             actionCards.Add(new CardModel { Type = CardType.Skip,      Name = "Bỏ Lượt",       Description = "Bỏ qua lượt hiện tại không cần rút bài",         Icon = "⏭️", Color = "#3b82f6" });
             actionCards.Add(new CardModel { Type = CardType.Attack,    Name = "Ép Lượt",       Description = "Bỏ lượt & ép đối thủ kế tiếp đi 2 lượt",        Icon = "🔄", Color = "#ef4444" });
@@ -25,8 +33,8 @@ public class MythicCardsDeckBuilder
             actionCards.Add(new CardModel { Type = CardType.Steal,     Name = "Cướp Bài",      Description = "Cướp 1 lá ngẫu nhiên trên tay đối thủ",          Icon = "🎁", Color = "#f59e0b" });
         }
 
-        // Normal cards (8 copies each for combo building)
-        for (int i = 0; i < 8; i++)
+        // Normal cards (for combo building)
+        for (int i = 0; i < normalCopies; i++)
         {
             actionCards.Add(new CardModel { Type = CardType.Normal1, Name = "Cáo Chín Đuôi", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🦊", Color = "#78716c" });
             actionCards.Add(new CardModel { Type = CardType.Normal2, Name = "Rồng Con",      Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🐲", Color = "#78716c" });
@@ -35,8 +43,8 @@ public class MythicCardsDeckBuilder
             actionCards.Add(new CardModel { Type = CardType.Normal5, Name = "Golem Đá",      Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🪨", Color = "#78716c" });
         }
 
-        // Expansion cards (3 each)
-        for (int i = 0; i < 3; i++)
+        // Expansion cards
+        for (int i = 0; i < expansionCopies; i++)
         {
             actionCards.Add(new CardModel { Type = CardType.AlterFuture,    Name = "Đổi Tương Lai", Description = "Xem và tự do sắp xếp lại 3 lá đầu tiên",        Icon = "🔮", Color = "#c084fc" });
             actionCards.Add(new CardModel { Type = CardType.DrawBottom,     Name = "Rút Đáy",       Description = "Kết thúc lượt bằng cách rút lá dưới cùng",       Icon = "⚓", Color = "#0284c7" });
@@ -44,9 +52,9 @@ public class MythicCardsDeckBuilder
         }
 
         // Nope & Favor
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < nopeCopies; i++)
             actionCards.Add(new CardModel { Type = CardType.Nope,  Name = "Chặn (Nope)", Description = "Huỷ bỏ một hành động vừa diễn ra (trừ Gỡ Bẫy/Bẫy Nổ).", Icon = "🛑", Color = "#ef4444" });
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < favorCopies; i++)
             actionCards.Add(new CardModel { Type = CardType.Favor, Name = "Xin Xỏ",     Description = "Bắt 1 người chơi tự chọn và nộp cho bạn 1 lá bài.",         Icon = "🙏", Color = "#fcd34d" });
 
         Shuffle(actionCards);
@@ -70,12 +78,13 @@ public class MythicCardsDeckBuilder
         // Build remaining deck with bombs + extra defuses
         var deck = new List<CardModel>(actionCards);
 
-        // 4 bombs always
-        for (int i = 0; i < 4; i++)
+        // Always 4 Bombs
+        int bombCount = 4;
+        for (int i = 0; i < bombCount; i++)
             deck.Add(new CardModel { Type = CardType.ExplodingTrap, Name = "Bẫy Nổ", Description = "Nổ tung và loại người chơi khỏi bàn!", Icon = "💣", Color = "#dc2626" });
 
-        // Extra defuses so total = 8
-        int extraDefuses = 8 - room.Players.Count;
+        // Total Defuses = N players * 2 (1 per player in hand + N extra in deck)
+        int extraDefuses = playerCount;
         for (int i = 0; i < extraDefuses; i++)
             deck.Add(new CardModel { Type = CardType.Defuse, Name = "Gỡ Bẫy", Description = "Cứu bạn khi rút phải Bẫy Nổ", Icon = "🛡️", Color = "#06b6d4" });
 
