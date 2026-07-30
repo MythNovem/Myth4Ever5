@@ -270,14 +270,49 @@
     min-height: 140px;
 }
 
+.hand-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 .hand-label {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-muted);
-    align-self: flex-start;
 }
+
+.btn-sort-hand {
+    background: rgba(123, 82, 214, 0.2);
+    border: 1px solid rgba(123, 82, 214, 0.4);
+    color: var(--gold-bright);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.btn-sort-hand:hover {
+    background: rgba(123, 82, 214, 0.4);
+    border-color: var(--violet-bright);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+}
+
+.btn-sort-hand:active {
+    transform: translateY(0);
+}
+
 
 .hand-cards {
     display: flex;

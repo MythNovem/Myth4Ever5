@@ -99,7 +99,36 @@ class MCHandRenderer {
             });
         }
 
+        // Bind sort button click
+        const sortBtn = document.getElementById('btn-sort-hand');
+        if (sortBtn) {
+            sortBtn.onclick = () => this.sortHand(state, myId);
+        }
+
         this._renderPlayButton(isMyTurn);
+    }
+
+    sortHand(state, myId) {
+        if (!state || !state.playerHands) return;
+        const myHand = state.playerHands[myId] || [];
+        if (myHand.length <= 1) return;
+
+        // Group identical/same-type cards together
+        const sortedHand = [...myHand].sort((a, b) => {
+            const typeA = (a.type || '').toLowerCase();
+            const typeB = (b.type || '').toLowerCase();
+            const typeComp = typeA.localeCompare(typeB);
+            if (typeComp !== 0) return typeComp;
+
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+
+        const sortedIds = sortedHand.map(card => card.id);
+        if (window.signalRService) {
+            window.signalRService.sendGameAction('reorder_hand', { cardIds: sortedIds });
+        }
     }
 
     toggleCardSelection(cardId, state, myId) {

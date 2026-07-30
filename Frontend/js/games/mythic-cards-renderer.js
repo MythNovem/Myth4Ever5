@@ -64,7 +64,12 @@ class MythicCardsRenderer {
             </div>
 
             <div class="hand-area" id="hand-area">
-                <span class="hand-label">Bài trên tay</span>
+                <div class="hand-header">
+                    <span class="hand-label">Bài trên tay</span>
+                    <button id="btn-sort-hand" class="btn-sort-hand" title="Tự động xếp các lá bài giống nhau đứng cạnh nhau">
+                        🧹 Xếp bài
+                    </button>
+                </div>
                 <div class="hand-cards" id="my-hand-container"></div>
             </div>
 

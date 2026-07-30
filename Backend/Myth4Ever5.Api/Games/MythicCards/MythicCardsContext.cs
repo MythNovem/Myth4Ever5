@@ -13,6 +13,8 @@ public class MythicCardsContext
 
     public object SanitizeState(RoomModel room, MythicCardsState state)
     {
+        CheckAndRefillEmptyHands(room, state);
+
         return new
         {
             DeckCount = state.Deck.Count,
@@ -35,6 +37,48 @@ public class MythicCardsContext
             PendingFavorTargetId = state.PendingFavorTargetId,
             CurrentPendingAction = state.CurrentPendingAction
         };
+    }
+
+    public void CheckAndRefillEmptyHands(RoomModel room, MythicCardsState state)
+    {
+        if (room == null || state == null || room.Players == null) return;
+
+        foreach (var player in room.Players)
+        {
+            if (!player.IsAlive) continue;
+
+            if (!state.PlayerHands.TryGetValue(player.PlayerId, out var hand) || hand == null)
+            {
+                hand = new List<CardModel>();
+                state.PlayerHands[player.PlayerId] = hand;
+            }
+
+            if (hand.Count == 0)
+            {
+                int countToDraw = Math.Min(5, state.Deck.Count);
+                if (countToDraw > 0)
+                {
+                    state.GameLogs.Add($"🃏 {player.PlayerName} không còn lá nào trên tay nên được tự động rút bù {countToDraw} lá!");
+                    for (int i = 0; i < countToDraw; i++)
+                    {
+                        if (state.Deck.Count == 0) break;
+                        var card = state.Deck[0];
+                        state.Deck.RemoveAt(0);
+
+                        hand.Add(card);
+
+                        if (card.Type == CardType.ExplodingTrap)
+                        {
+                            state.IsExploding = true;
+                            state.ExplodingPlayerId = player.PlayerId;
+                            state.ExplodeExpiryTime = DateTime.UtcNow.AddSeconds(10);
+                            state.GameLogs.Add($"💣 BÁO ĐỘNG! {player.PlayerName} rút phải BẪY NỔ khi rút bù bài!");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public GameActionResult CheckGameOverOrContinue(RoomModel room, MythicCardsState state, string actionType, object data)
