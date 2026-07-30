@@ -459,20 +459,6 @@
    GAME LOGS
    ============================================ */
 
-.game-log-bar {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 10px 16px;
-    background: var(--surface-0);
-    border: 1px solid var(--border-dim);
-    border-radius: var(--r-md);
-    height: 76px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-dim) transparent;
-    width: calc(100% - 48px);
-}
-
 .log-line {
     font-size: 12px;
     color: var(--text-secondary);

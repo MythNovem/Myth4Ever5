@@ -45,7 +45,7 @@ public class ComboCardEffectHandler
                     hand.Add(stolen);
 
                     var robberName = player.PlayerName;
-                    state.GameLogs.Add($"🎁 {robberName} dùng Combo 2 lá cướp lá {stolen.Name} {stolen.Icon} của {target.PlayerName}!");
+                    state.GameLogs.Add($"🎁 {robberName} dùng Combo 2 lá cướp 1 lá bài của {target.PlayerName}!");
 
                     // Move played cards to discard
                     foreach (var c in cardsToPlay) { hand.Remove(c); state.DiscardPile.Add(c); }

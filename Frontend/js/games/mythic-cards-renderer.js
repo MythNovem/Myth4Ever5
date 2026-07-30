@@ -55,7 +55,12 @@ class MythicCardsRenderer {
                     </div>
                 </div>
 
-                <div class="game-log-bar" id="game-logs-box"></div>
+                <div class="game-log-bar" id="game-logs-box">
+                    <div style="font-size:11px; font-weight:bold; color:var(--gold-bright); margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border-dim); display:flex; justify-content:space-between; align-items:center;">
+                        <span>📜 Nhật Ký Trận Đấu</span>
+                    </div>
+                    <div id="game-logs-content"></div>
+                </div>
             </div>
 
             <div class="hand-area" id="hand-area">
@@ -152,6 +157,10 @@ class MythicCardsRenderer {
             }
         }
 
+        if (actionType === 'favor_resolved' && window.mcModalManager) {
+            window.mcModalManager.showFavorResultModal(data, myId);
+        }
+
         if (actionType === 'player_exploded') {
             if (window.soundFX) window.soundFX.play('explosion');
             const table = document.getElementById('card-table');
@@ -206,9 +215,10 @@ class MythicCardsRenderer {
 
         // Game logs
         const logsBox = document.getElementById('game-logs-box');
-        if (logsBox && gameLogs) {
-            logsBox.innerHTML = gameLogs.map(log => `<div class="log-line">${log}</div>`).join('');
-            logsBox.scrollTop = logsBox.scrollHeight;
+        const logsContent = document.getElementById('game-logs-content') || logsBox;
+        if (logsContent && gameLogs) {
+            logsContent.innerHTML = gameLogs.map(log => `<div class="log-line">${log}</div>`).join('');
+            if (logsBox) logsBox.scrollTop = logsBox.scrollHeight;
         }
 
         // Timers & Favor (Always runs for ALL clients, host & guest!)

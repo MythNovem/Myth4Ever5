@@ -33,5 +33,6 @@ public class PendingAction
     public DateTime ExpiryTime { get; set; }
     public string TargetPlayerId { get; set; } = string.Empty; // For Favor
     public string CardNames { get; set; } = string.Empty;
+    public string LastActionPlayerId { get; set; } = string.Empty;
 }
 

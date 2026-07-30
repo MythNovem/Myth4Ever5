@@ -63,15 +63,20 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
             if (state.CurrentPendingAction == null)
                 return new GameActionResult { Success = false, Message = "Không có hành động nào đang chờ để Chặn!" };
 
-            if (state.CurrentPendingAction.SourcePlayerId == playerId)
-                return new GameActionResult { Success = false, Message = "Bạn không thể tự chặn bài của chính mình!" };
+            string lastPlayerId = !string.IsNullOrEmpty(state.CurrentPendingAction.LastActionPlayerId) 
+                ? state.CurrentPendingAction.LastActionPlayerId 
+                : state.CurrentPendingAction.SourcePlayerId;
+
+            if (lastPlayerId == playerId)
+                return new GameActionResult { Success = false, Message = "Bạn không thể tự Chặn lá bài/lá Chặn của chính mình!" };
 
             var nopeCard = cardsToPlay[0];
             hand.Remove(nopeCard);
             state.DiscardPile.Add(nopeCard);
 
             state.CurrentPendingAction.NopeCount++;
-            state.CurrentPendingAction.ExpiryTime = DateTime.UtcNow.AddSeconds(5);
+            state.CurrentPendingAction.LastActionPlayerId = playerId;
+            state.CurrentPendingAction.ExpiryTime = DateTime.UtcNow.AddSeconds(10);
 
             string nopeType = state.CurrentPendingAction.NopeCount % 2 == 1 ? "🛑 CHẶN (NOPE)!" : "✅ YUP! (CHẶN LẠI CHẶN)";
             state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã ném {nopeType}");
@@ -146,9 +151,10 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
         state.CurrentPendingAction = new PendingAction
         {
             SourcePlayerId = playerId,
+            LastActionPlayerId = playerId,
             ActionType = "play_card",
             Payload = payload,
-            ExpiryTime = DateTime.UtcNow.AddSeconds(5),
+            ExpiryTime = DateTime.UtcNow.AddSeconds(10),
             NopeCount = 0,
             CardNames = cardNamesStr
         };

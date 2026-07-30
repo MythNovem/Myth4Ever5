@@ -74,7 +74,7 @@ public class MythicCardsEngine : IGameEngine
         // Actions allowed regardless of turn
         bool isAllowedOutOfTurn = actionType is "insert_trap" or "surrender" or "reorder_hand"
                                             or "resolve_pending_action" or "resolve_exploding_timer"
-                                            or "play_card";
+                                            or "play_card" or "give_favor_card" or "rearrange_future";
 
         if (!isMyTurn && !isAllowedOutOfTurn)
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
