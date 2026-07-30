@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Bind to PORT assigned by Render / Cloud host (default 5000 for local)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-builder.WebHost.UseUrls($"http://*:{port}");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // 1. CORS — cho phép mọi origin (dev mode)
 builder.Services.AddCors(options =>
@@ -35,8 +35,7 @@ builder.Services.AddSingleton<GameEngineFactory>();
 
 // Auto-discover and register all IGameEngine implementations.
 // Adding a new game = create a class implementing IGameEngine — no changes needed here.
-var engineTypes = AppDomain.CurrentDomain.GetAssemblies()
-    .SelectMany(a => a.GetTypes())
+var engineTypes = typeof(Program).Assembly.GetTypes()
     .Where(t => typeof(IGameEngine).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
 foreach (var engineType in engineTypes)
     builder.Services.AddSingleton(typeof(IGameEngine), engineType);
