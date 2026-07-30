@@ -75,7 +75,7 @@ public class SurrenderHandler : IGameActionHandler<MythicCardsState>
     }
 }
 
-/// <summary>Handles "reorder_hand" — player rearranges their hand cards.</summary>
+/// <summary>Handles "reorder_hand" — player rearranges their hand cards safely.</summary>
 public class ReorderHandHandler : IGameActionHandler<MythicCardsState>
 {
     public string ActionType => "reorder_hand";
@@ -87,17 +87,26 @@ public class ReorderHandHandler : IGameActionHandler<MythicCardsState>
         if (!payload.TryGetProperty("cardIds", out var cardIdsProp))
             return new GameActionResult { Success = false, Message = "Invalid reorder payload" };
 
-        var cardIds = cardIdsProp.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+        var cardIds = cardIdsProp.EnumerateArray().Select(e => e.GetString() ?? "").Where(id => !string.IsNullOrEmpty(id)).ToList();
         var hand = state.PlayerHands[playerId];
 
-        if (cardIds.Count != hand.Count)
-            return new GameActionResult { Success = false, Message = "Invalid reorder payload" };
+        var reorderedHand = new List<CardModel>();
+        var remainingCards = new List<CardModel>(hand);
 
-        var newHand = cardIds.Select(id => hand.FirstOrDefault(c => c.Id == id)).Where(c => c != null).Cast<CardModel>().ToList();
-        if (newHand.Count != hand.Count)
-            return new GameActionResult { Success = false, Message = "Invalid reorder payload" };
+        foreach (var id in cardIds)
+        {
+            var matchedCard = remainingCards.FirstOrDefault(c => c.Id == id);
+            if (matchedCard != null)
+            {
+                reorderedHand.Add(matchedCard);
+                remainingCards.Remove(matchedCard);
+            }
+        }
 
-        state.PlayerHands[playerId] = newHand;
+        // Append any remaining cards that weren't specified in cardIds
+        reorderedHand.AddRange(remainingCards);
+
+        state.PlayerHands[playerId] = reorderedHand;
         return new GameActionResult { Success = true, ActionType = "reorder_hand", Data = _ctx.SanitizeState(room, state) };
     }
 }

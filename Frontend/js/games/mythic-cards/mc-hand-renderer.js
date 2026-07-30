@@ -68,29 +68,36 @@ class MCHandRenderer {
             });
 
             cardEl.addEventListener('dragstart', () => {
-                draggedCard = cardEl;
+                this._draggedCard = cardEl;
                 setTimeout(() => cardEl.style.opacity = '0.5', 0);
             });
             cardEl.addEventListener('dragend', () => {
-                if (draggedCard) draggedCard.style.opacity = '1';
-                draggedCard = null;
+                if (this._draggedCard) this._draggedCard.style.opacity = '1';
+                this._draggedCard = null;
             });
         });
 
-        // Drag-to-reorder
-        container.addEventListener('dragover', e => {
-            e.preventDefault();
-            if (!draggedCard) return;
-            const after = this._getDragAfterElement(container, e.clientX);
-            if (after == null) container.appendChild(draggedCard);
-            else container.insertBefore(draggedCard, after);
-        });
+        // Drag-to-reorder (attached once to avoid duplicate listener spam)
+        if (!container.dataset.dragBound) {
+            container.dataset.dragBound = 'true';
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                if (!this._draggedCard) return;
+                const after = this._getDragAfterElement(container, e.clientX);
+                if (after == null) container.appendChild(this._draggedCard);
+                else container.insertBefore(this._draggedCard, after);
+            });
 
-        container.addEventListener('drop', e => {
-            e.preventDefault();
-            const newOrder = Array.from(container.querySelectorAll('.game-card')).map(el => el.getAttribute('data-card-id'));
-            window.signalRService.sendGameAction('reorder_hand', { cardIds: newOrder });
-        });
+            container.addEventListener('drop', e => {
+                e.preventDefault();
+                const newOrder = Array.from(container.querySelectorAll('.game-card'))
+                    .map(el => el.getAttribute('data-card-id'))
+                    .filter(id => id);
+                if (newOrder.length > 0) {
+                    window.signalRService.sendGameAction('reorder_hand', { cardIds: newOrder });
+                }
+            });
+        }
 
         this._renderPlayButton(isMyTurn);
     }
