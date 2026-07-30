@@ -37,8 +37,8 @@ public class ComboCardEffectHandler
             {
                 if (targetHand.Count > 0)
                 {
-                    int targetCardIndex = payload.TryGetProperty("targetCardIndex", out var ti) && ti.ValueKind == JsonValueKind.Number ? ti.GetInt32() : -1;
-                    int stealIdx = (targetCardIndex >= 0 && targetCardIndex < targetHand.Count) ? targetCardIndex : _ctx.RandomInt(targetHand.Count);
+                    // Always steal a random card from victim's hand to prevent position guessing / exploit
+                    int stealIdx = _ctx.RandomInt(targetHand.Count);
 
                     var stolen = targetHand[stealIdx];
                     targetHand.RemoveAt(stealIdx);

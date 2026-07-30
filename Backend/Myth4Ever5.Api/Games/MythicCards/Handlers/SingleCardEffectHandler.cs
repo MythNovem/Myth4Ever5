@@ -84,14 +84,15 @@ public class SingleCardEffectHandler
     private object? HandleSteal(RoomModel room, MythicCardsState state, string playerId, List<CardModel> hand, JsonElement payload)
     {
         string targetId = payload.TryGetProperty("targetPlayerId", out var tp) ? tp.GetString() ?? "" : "";
-        int targetCardIndex = payload.TryGetProperty("targetCardIndex", out var ti) && ti.ValueKind == JsonValueKind.Number ? ti.GetInt32() : -1;
 
         var aliveTargets = room.Players.Where(p => p.PlayerId != playerId && p.IsAlive && state.PlayerHands[p.PlayerId].Count > 0).ToList();
         if (aliveTargets.Count == 0) return null;
 
         var target = aliveTargets.FirstOrDefault(p => p.PlayerId == targetId) ?? aliveTargets[_ctx.RandomInt(aliveTargets.Count)];
         var targetHand = state.PlayerHands[target.PlayerId];
-        int stealIdx = (targetCardIndex >= 0 && targetCardIndex < targetHand.Count) ? targetCardIndex : _ctx.RandomInt(targetHand.Count);
+
+        // Always steal a random card from victim's hand to prevent position guessing / exploit
+        int stealIdx = _ctx.RandomInt(targetHand.Count);
 
         var stolen = targetHand[stealIdx];
         targetHand.RemoveAt(stealIdx);
