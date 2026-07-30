@@ -6,6 +6,10 @@ using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Bind to PORT assigned by Render / Cloud host (default 5000 for local)
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+builder.WebHost.UseUrls($"http://*:{port}");
+
 // 1. CORS — cho phép mọi origin (dev mode)
 builder.Services.AddCors(options =>
 {
