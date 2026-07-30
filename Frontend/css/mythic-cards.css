@@ -101,6 +101,9 @@
 
 .seat-top-left    { top: -30px; left: 10%; }
 .seat-top-right   { top: -30px; right: 10%; }
+.seat-top-center  { top: -30px; left: 50%; transform: translateX(-50%); }
+.seat-left-mid    { top: 50%; left: -30px; transform: translateY(-50%); }
+.seat-right-mid   { top: 50%; right: -30px; transform: translateY(-50%); }
 .seat-bottom-me   { bottom: -30px; left: 50%; transform: translateX(-50%); }
 
 .seat-avatar {
@@ -329,6 +332,14 @@
     z-index: 50;
 }
 
+/* Selected state */
+.game-card.selected {
+    transform: translateY(-24px) scale(1.05);
+    border-color: var(--gold-bright);
+    box-shadow: 0 0 0 2px var(--gold-bright), 0 16px 32px rgba(0,0,0,0.8), 0 0 24px rgba(245,204,106,0.4);
+    z-index: 60;
+}
+
 .card-type-label {
     font-size: 9px;
     font-weight: 700;
@@ -390,6 +401,19 @@
 }
 .card--explodingtrap:hover { border-color: #dc2626; box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 20px rgba(220,38,38,0.4); }
 .card--explodingtrap .card-name { color: #f87171; }
+
+/* Normal Cards (Combo Cards) */
+.card--normal1, .card--normal2, .card--normal3, .card--normal4, .card--normal5 {
+    border-color: rgba(168, 162, 158, 0.3);
+    background: linear-gradient(160deg, var(--surface-1) 0%, #1e1b26 100%);
+}
+.card--normal1:hover, .card--normal2:hover, .card--normal3:hover, .card--normal4:hover, .card--normal5:hover {
+    border-color: #a8a29e;
+    box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 16px rgba(168,162,158,0.2);
+}
+.card--normal1 .card-name, .card--normal2 .card-name, .card--normal3 .card-name, .card--normal4 .card-name, .card--normal5 .card-name {
+    color: #d6d3d1;
+}
 
 /* ============================================
    GAME LOGS

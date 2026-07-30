@@ -20,13 +20,23 @@ public class MythicCardsEngine : IGameEngine
 
         // 1. Tạo các lá bài Action cơ bản
         var actionCards = new List<CardModel>();
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 6; i++) // Tăng số lượng bài lên 6 bộ (30 lá) để deck dày hơn
         {
             actionCards.Add(new CardModel { Type = CardType.Skip, Name = "Bỏ Lượt", Description = "Bỏ qua lượt hiện tại không cần rút bài", Icon = "⏭️", Color = "#3b82f6" });
             actionCards.Add(new CardModel { Type = CardType.Attack, Name = "Ép Lượt", Description = "Bỏ lượt & ép đối thủ kế tiếp đi 2 lượt", Icon = "🔄", Color = "#ef4444" });
             actionCards.Add(new CardModel { Type = CardType.SeeFuture, Name = "Nhìn Tương Lai", Description = "Xem 3 lá bài đầu tiên của bộ bài", Icon = "👁️", Color = "#8b5cf6" });
             actionCards.Add(new CardModel { Type = CardType.Shuffle, Name = "Xáo Bài", Description = "Xáo trộn ngẫu nhiên bộ bài rút", Icon = "🔀", Color = "#10b981" });
             actionCards.Add(new CardModel { Type = CardType.Steal, Name = "Cướp Bài", Description = "Cướp 1 lá ngẫu nhiên trên tay đối thủ", Icon = "🎁", Color = "#f59e0b" });
+        }
+
+        // Thêm 4 bản sao cho mỗi loại Bài Thường
+        for (int i = 0; i < 4; i++)
+        {
+            actionCards.Add(new CardModel { Type = CardType.Normal1, Name = "Cáo Chín Đuôi", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🦊", Color = "#78716c" });
+            actionCards.Add(new CardModel { Type = CardType.Normal2, Name = "Rồng Con", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🐲", Color = "#78716c" });
+            actionCards.Add(new CardModel { Type = CardType.Normal3, Name = "Sói Băng", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🐺", Color = "#78716c" });
+            actionCards.Add(new CardModel { Type = CardType.Normal4, Name = "Tinh Linh", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🧚", Color = "#78716c" });
+            actionCards.Add(new CardModel { Type = CardType.Normal5, Name = "Golem Đá", Description = "Bài thường. Ghép bộ để tạo Combo.", Icon = "🪨", Color = "#78716c" });
         }
 
         // Xáo trộn các lá Action để chia
@@ -117,31 +127,64 @@ public class MythicCardsEngine : IGameEngine
             return new GameActionResult { Success = false, Message = "Đang chờ người chơi chọn vị trí giấu Bẫy!" };
         }
 
-        if (!payload.TryGetProperty("cardId", out var cardIdProp))
+        if (!payload.TryGetProperty("cardIds", out var cardIdsProp))
         {
-            return new GameActionResult { Success = false, Message = "Thiếu cardId" };
+            return new GameActionResult { Success = false, Message = "Thiếu cardIds" };
         }
 
-        string cardId = cardIdProp.GetString() ?? "";
+        var cardIds = cardIdsProp.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+        if (cardIds.Count == 0)
+        {
+            return new GameActionResult { Success = false, Message = "Chưa chọn lá bài nào" };
+        }
+
         var hand = state.PlayerHands[playerId];
-        var card = hand.FirstOrDefault(c => c.Id == cardId);
+        var cardsToPlay = new List<CardModel>();
 
-        if (card == null)
+        foreach (var id in cardIds)
         {
-            return new GameActionResult { Success = false, Message = "Bạn không có lá bài này trên tay" };
+            var c = hand.FirstOrDefault(x => x.Id == id);
+            if (c == null) return new GameActionResult { Success = false, Message = "Lá bài không tồn tại trên tay" };
+            cardsToPlay.Add(c);
         }
 
-        if (card.Type == CardType.Defuse || card.Type == CardType.ExplodingTrap)
+        if (cardsToPlay.Any(c => c.Type == CardType.Defuse || c.Type == CardType.ExplodingTrap))
         {
-            return new GameActionResult { Success = false, Message = "Lá bài này không thể tự ý đánh ra!" };
+            return new GameActionResult { Success = false, Message = "Bẫy Nổ và Gỡ Bẫy không thể tự ý đánh ra!" };
         }
 
-        hand.Remove(card);
-        state.DiscardPile.Add(card);
+        // Logic đánh 1 lá (Action cơ bản)
+        if (cardsToPlay.Count == 1)
+        {
+            var card = cardsToPlay[0];
+            if (IsNormalCard(card.Type))
+            {
+                return new GameActionResult { Success = false, Message = "Bài thường phải đánh theo bộ, không được đánh lẻ!" };
+            }
 
-        string playerMsg = $"{room.Players.First(p => p.ConnectionId == playerId).PlayerName} đã đánh lá [{card.Name}] {card.Icon}";
-        state.GameLogs.Add(playerMsg);
+            hand.Remove(card);
+            state.DiscardPile.Add(card);
 
+            string playerMsg = $"{room.Players.First(p => p.ConnectionId == playerId).PlayerName} đã đánh lá [{card.Name}] {card.Icon}";
+            state.GameLogs.Add(playerMsg);
+
+            return ExecuteSingleCardEffect(room, state, playerId, card, payload);
+        }
+        else
+        {
+            // Logic đánh Combo (2, 3, 5 lá)
+            return ExecuteComboEffect(room, state, playerId, cardsToPlay, payload);
+        }
+    }
+
+    private bool IsNormalCard(CardType type)
+    {
+        return type == CardType.Normal1 || type == CardType.Normal2 || type == CardType.Normal3 || type == CardType.Normal4 || type == CardType.Normal5;
+    }
+
+    private GameActionResult ExecuteSingleCardEffect(RoomModel room, MythicCardsState state, string playerId, CardModel card, JsonElement payload)
+    {
+        var hand = state.PlayerHands[playerId];
         object? extraData = null;
 
         switch (card.Type)
@@ -155,8 +198,9 @@ public class MythicCardsEngine : IGameEngine
                 break;
 
             case CardType.Attack:
+                // Kết thúc lượt hiện tại ngay lập tức, người tiếp theo chịu 2 lượt
                 AdvanceTurn(room, state);
-                state.TurnsToTake += 2;
+                state.TurnsToTake = 2;
                 break;
 
             case CardType.SeeFuture:
@@ -192,6 +236,114 @@ public class MythicCardsEngine : IGameEngine
         {
             PlayerId = playerId,
             Card = card,
+            ExtraData = extraData,
+            RoomState = SanitizeStateForBroadcast(room, state)
+        });
+    }
+
+    private GameActionResult ExecuteComboEffect(RoomModel room, MythicCardsState state, string playerId, List<CardModel> cardsToPlay, JsonElement payload)
+    {
+        int count = cardsToPlay.Count;
+        var hand = state.PlayerHands[playerId];
+        var player = room.Players.First(p => p.ConnectionId == playerId);
+        
+        bool isPair = count == 2 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
+        bool isThree = count == 3 && cardsToPlay.All(c => c.Type == cardsToPlay[0].Type);
+        bool isFiveDiff = count == 5 && cardsToPlay.Select(c => c.Type).Distinct().Count() == 5;
+
+        if (!isPair && !isThree && !isFiveDiff)
+        {
+            return new GameActionResult { Success = false, Message = "Combo không hợp lệ! Chỉ được đánh 2 lá giống nhau, 3 lá giống nhau, hoặc 5 lá khác nhau." };
+        }
+
+        object? extraData = null;
+
+        if (isPair || isThree)
+        {
+            string targetId = "";
+            if (payload.TryGetProperty("targetPlayerId", out var targetProp))
+            {
+                targetId = targetProp.GetString() ?? "";
+            }
+
+            var target = room.Players.FirstOrDefault(p => p.ConnectionId == targetId && p.IsAlive && p.ConnectionId != playerId);
+            if (target == null)
+            {
+                return new GameActionResult { Success = false, Message = "Mục tiêu không hợp lệ hoặc đã bị loại!" };
+            }
+
+            var targetHand = state.PlayerHands[target.ConnectionId];
+
+            if (isPair)
+            {
+                if (targetHand.Count > 0)
+                {
+                    var stolenCard = targetHand[_random.Next(targetHand.Count)];
+                    targetHand.Remove(stolenCard);
+                    hand.Add(stolenCard);
+                    state.GameLogs.Add($"{player.PlayerName} dùng Combo 2 lá cướp 1 lá bài của {target.PlayerName}!");
+                }
+                else
+                {
+                    state.GameLogs.Add($"{player.PlayerName} dùng Combo 2 lá nhắm vào {target.PlayerName} nhưng họ không còn bài!");
+                }
+            }
+            else if (isThree)
+            {
+                string targetCardTypeStr = "";
+                if (payload.TryGetProperty("targetCardType", out var typeProp))
+                {
+                    targetCardTypeStr = typeProp.GetString() ?? "";
+                }
+
+                if (!Enum.TryParse<CardType>(targetCardTypeStr, out var requestedType))
+                {
+                    return new GameActionResult { Success = false, Message = "Loại bài yêu cầu không hợp lệ!" };
+                }
+
+                var cardToGive = targetHand.FirstOrDefault(c => c.Type == requestedType);
+                if (cardToGive != null)
+                {
+                    targetHand.Remove(cardToGive);
+                    hand.Add(cardToGive);
+                    state.GameLogs.Add($"{player.PlayerName} dùng Combo 3 lá đòi lá {requestedType} từ {target.PlayerName} và THÀNH CÔNG!");
+                }
+                else
+                {
+                    state.GameLogs.Add($"{player.PlayerName} dùng Combo 3 lá đòi lá {requestedType} từ {target.PlayerName} nhưng THẤT BẠI (không có)!");
+                }
+            }
+        }
+        else if (isFiveDiff)
+        {
+            string targetCardIdFromDiscard = "";
+            if (payload.TryGetProperty("targetCardIdFromDiscard", out var discardProp))
+            {
+                targetCardIdFromDiscard = discardProp.GetString() ?? "";
+            }
+
+            var cardToRevive = state.DiscardPile.FirstOrDefault(c => c.Id == targetCardIdFromDiscard);
+            if (cardToRevive == null)
+            {
+                return new GameActionResult { Success = false, Message = "Lá bài muốn lấy không có trong Discard Pile!" };
+            }
+
+            state.DiscardPile.Remove(cardToRevive);
+            hand.Add(cardToRevive);
+            state.GameLogs.Add($"{player.PlayerName} dùng Combo 5 lá khác nhau bới rác lấy lại lá {cardToRevive.Name}!");
+        }
+
+        // Bỏ các lá bài đã dùng vào Discard Pile
+        foreach (var c in cardsToPlay)
+        {
+            hand.Remove(c);
+            state.DiscardPile.Add(c);
+        }
+
+        return CheckGameOverOrContinue(room, state, "combo_played", new
+        {
+            PlayerId = playerId,
+            ComboSize = count,
             ExtraData = extraData,
             RoomState = SanitizeStateForBroadcast(room, state)
         });

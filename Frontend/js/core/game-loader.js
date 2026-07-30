@@ -12,6 +12,14 @@ class GameLoader {
         document.getElementById('room-view').style.display = 'none';
         document.getElementById('game-container').style.display = 'block';
 
+        // Ẩn Header để có không gian rộng rãi (trang riêng)
+        const header = document.querySelector('.app-header');
+        if (header) header.style.display = 'none';
+
+        // Ẩn Chat Panel tĩnh (chỉ giữ lại thanh chat dưới cùng)
+        const chatPanel = document.getElementById('chat-panel');
+        if (chatPanel) chatPanel.style.display = 'none';
+
         const renderer = this.renderers[gameTypeId];
         if (renderer) {
             this.activeRenderer = renderer;

@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Myth4Ever5.Api.Games.MythicCards.Models;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum CardType
 {
     ExplodingTrap, // Bẫy Nổ
@@ -8,7 +11,12 @@ public enum CardType
     Attack,        // Ép Lượt (+2 lượt cho đối thủ)
     SeeFuture,     // Nhìn Trước Tương Lai 3 lá
     Shuffle,       // Xáo Bài
-    Steal          // Cướp Bài
+    Steal,         // Cướp Bài
+    Normal1,       // Cáo Chín Đuôi
+    Normal2,       // Rồng Con
+    Normal3,       // Sói Băng
+    Normal4,       // Tinh Linh
+    Normal5        // Golem Đá
 }
 
 public class CardModel
