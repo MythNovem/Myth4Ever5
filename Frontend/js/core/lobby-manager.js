@@ -238,6 +238,12 @@ class LobbyManager {
         msgEl.innerHTML = `${senderAvatar} <span class="sender">${senderName}</span><span class="time">${time}</span> ${message}`;
         container.appendChild(msgEl);
         container.scrollTop = container.scrollHeight;
+
+        const chatPanel = document.getElementById('chat-panel');
+        if (chatPanel && chatPanel.classList.contains('collapsed')) {
+            const unreadDot = document.getElementById('unread-chat-dot');
+            if (unreadDot) unreadDot.style.display = 'inline';
+        }
     }
 }
 

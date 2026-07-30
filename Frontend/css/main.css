@@ -577,38 +577,8 @@ main, header, footer, section {
 }
 
 /* ============================================
-   CHAT PANEL
+   CHAT MESSAGES
    ============================================ */
-
-.chat-panel {
-    position: fixed;
-    bottom: 76px;
-    left: 20px;
-    width: 280px;
-    height: 200px;
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-    padding: 12px;
-}
-
-.chat-panel-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-dim);
-}
-
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-dim) transparent;
-}
 
 .chat-message {
     padding: 4px 0;
@@ -673,21 +643,40 @@ main, header, footer, section {
    TOP FLOATING CHAT & GAME LOGS (CORNER PANELS)
    ============================================ */
 
-/* Chat Panel - Top Right Corner */
+/* Chat Panel - Middle Right Side */
 .chat-panel {
     position: fixed;
-    top: 16px;
+    top: 50%;
     right: 16px;
+    left: auto;
+    bottom: auto;
+    transform: translateY(-50%);
     width: 270px;
-    max-width: calc(100vw - 32px);
+    height: auto;
     z-index: 990;
-    background: rgba(15, 12, 28, 0.88);
+    background: rgba(15, 12, 28, 0.95);
     border: 1px solid var(--border-mid);
     border-radius: var(--r-lg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(12px);
-    transition: all 0.2s var(--ease-out);
+    transition: width 0.25s var(--ease-out), border-radius 0.25s var(--ease-out);
     overflow: hidden;
+    padding: 0;
+}
+
+.chat-panel.collapsed {
+    width: 120px;
+    border-radius: var(--r-full);
+}
+
+.chat-panel.collapsed .chat-panel-label {
+    border-bottom: none;
+    padding: 8px 12px;
+    justify-content: center;
+}
+
+.chat-panel.collapsed .chat-messages {
+    display: none !important;
 }
 
 .chat-panel-label {
@@ -701,7 +690,7 @@ main, header, footer, section {
 }
 
 .chat-messages {
-    max-height: 160px;
+    max-height: 180px;
     overflow-y: auto;
     padding: 8px;
     font-size: 12px;
