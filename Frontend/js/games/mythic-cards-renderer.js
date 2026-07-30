@@ -157,6 +157,10 @@ class MythicCardsRenderer {
             }
         }
 
+        if (actionType === 'favor_resolved' && window.mcModalManager) {
+            window.mcModalManager.showFavorResultModal(data, myId);
+        }
+
         if (actionType === 'player_exploded') {
             if (window.soundFX) window.soundFX.play('explosion');
             const table = document.getElementById('card-table');
@@ -273,15 +277,6 @@ class MythicCardsRenderer {
             window.mcModalManager.showDiscardPileModal(this.gameState);
         } else {
             window.lobbyManager.showToast(`Không có combo cho ${count} lá bài!`, 'danger');
-        }
-    }
-
-    handleAction(actionType, data) {
-        const myId = window.signalRService.getPlayerId();
-        if (actionType === 'card_stolen' && window.mcModalManager) {
-            window.mcModalManager.showStealResultModal(data, myId);
-        } else if (actionType === 'favor_resolved' && window.mcModalManager) {
-            window.mcModalManager.showFavorResultModal(data, myId);
         }
     }
 
