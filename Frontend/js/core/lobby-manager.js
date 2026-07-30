@@ -82,6 +82,10 @@ class LobbyManager {
     }
 
     clearRoomState() {
+        if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
+        const bannerContainer = document.getElementById('action-banner-container');
+        if (bannerContainer) bannerContainer.innerHTML = '';
+
         this.currentRoom = null;
         localStorage.removeItem('myth_room_code');
         document.getElementById('btn-leave-room').style.display = 'none';
@@ -119,6 +123,9 @@ class LobbyManager {
             document.getElementById('room-view').style.display = 'none';
         } else {
             document.getElementById('room-view').style.display = 'block';
+            if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
+            const bannerContainer = document.getElementById('action-banner-container');
+            if (bannerContainer) bannerContainer.innerHTML = '';
         }
 
         const myPlayerId = window.signalRService.getPlayerId();

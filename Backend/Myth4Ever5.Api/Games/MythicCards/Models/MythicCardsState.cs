@@ -32,5 +32,6 @@ public class PendingAction
     public int NopeCount { get; set; } = 0;
     public DateTime ExpiryTime { get; set; }
     public string TargetPlayerId { get; set; } = string.Empty; // For Favor
+    public string CardNames { get; set; } = string.Empty;
 }
 

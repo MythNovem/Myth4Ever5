@@ -145,6 +145,13 @@ class MythicCardsRenderer {
             }
         }
 
+        if (actionType === 'card_stolen' || data.stealInfo || data.StealInfo) {
+            const stealInfo = data.stealInfo || data.StealInfo || data.extraData?.stealInfo || data.extraData?.StealInfo;
+            if (stealInfo && window.mcModalManager) {
+                window.mcModalManager.showStealResultModal(stealInfo, myId);
+            }
+        }
+
         if (actionType === 'player_exploded') {
             if (window.soundFX) window.soundFX.play('explosion');
             const table = document.getElementById('card-table');
@@ -229,6 +236,10 @@ class MythicCardsRenderer {
             }
             if (card.type === 'TargetedAttack') {
                 window.mcModalManager.showTargetPlayerModal(selectedCardIds, "🎯 Ám Sát: Chọn mục tiêu để Ép đi 2 lượt", this.gameState, myId);
+                return;
+            }
+            if (card.type === 'Favor') {
+                window.mcModalManager.showTargetPlayerModal(selectedCardIds, "🙏 Xin Xỏ: Chọn mục tiêu để đòi 1 lá bài", this.gameState, myId);
                 return;
             }
             if (window.soundFX) window.soundFX.play('play');

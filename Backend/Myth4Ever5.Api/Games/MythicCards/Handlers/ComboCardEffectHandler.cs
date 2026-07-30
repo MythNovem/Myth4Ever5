@@ -37,10 +37,31 @@ public class ComboCardEffectHandler
             {
                 if (targetHand.Count > 0)
                 {
-                    var stolen = targetHand[_ctx.RandomInt(targetHand.Count)];
-                    targetHand.Remove(stolen);
+                    int targetCardIndex = payload.TryGetProperty("targetCardIndex", out var ti) && ti.ValueKind == JsonValueKind.Number ? ti.GetInt32() : -1;
+                    int stealIdx = (targetCardIndex >= 0 && targetCardIndex < targetHand.Count) ? targetCardIndex : _ctx.RandomInt(targetHand.Count);
+
+                    var stolen = targetHand[stealIdx];
+                    targetHand.RemoveAt(stealIdx);
                     hand.Add(stolen);
-                    state.GameLogs.Add($"{player.PlayerName} dùng Combo 2 lá cướp 1 lá bài của {target.PlayerName}!");
+
+                    var robberName = player.PlayerName;
+                    state.GameLogs.Add($"🎁 {robberName} dùng Combo 2 lá cướp lá {stolen.Name} {stolen.Icon} của {target.PlayerName}!");
+
+                    // Move played cards to discard
+                    foreach (var c in cardsToPlay) { hand.Remove(c); state.DiscardPile.Add(c); }
+
+                    return _ctx.CheckGameOverOrContinue(room, state, "card_stolen", new
+                    {
+                        StealInfo = new
+                        {
+                            RobberId = playerId,
+                            RobberName = robberName,
+                            VictimId = target.PlayerId,
+                            VictimName = target.PlayerName,
+                            StolenCard = stolen
+                        },
+                        RoomState = _ctx.SanitizeState(room, state)
+                    });
                 }
                 else state.GameLogs.Add($"{player.PlayerName} dùng Combo 2 lá nhắm vào {target.PlayerName} nhưng họ không còn bài!");
             }

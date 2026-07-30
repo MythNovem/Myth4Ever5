@@ -140,6 +140,8 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
 
         state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã sử dụng {string.Join(", ", cardsToPlay.Select(c => c.Name))}");
 
+        string cardNamesStr = string.Join(", ", cardsToPlay.Select(c => $"{c.Name} {c.Icon}".Trim()));
+
         // Queue as pending (awaiting Nope window)
         state.CurrentPendingAction = new PendingAction
         {
@@ -147,7 +149,8 @@ public class PlayCardHandler : IGameActionHandler<MythicCardsState>
             ActionType = "play_card",
             Payload = payload,
             ExpiryTime = DateTime.UtcNow.AddSeconds(5),
-            NopeCount = 0
+            NopeCount = 0,
+            CardNames = cardNamesStr
         };
 
         return new GameActionResult { Success = true, ActionType = "play_card", Data = _ctx.SanitizeState(room, state) };

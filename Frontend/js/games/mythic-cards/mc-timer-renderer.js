@@ -8,10 +8,12 @@ class MCTimerRenderer {
         this.activeTimers = [];
     }
 
-    /** Clear all running timers */
+    /** Clear all running timers and hide banner container */
     clear() {
         this.activeTimers.forEach(t => clearInterval(t));
         this.activeTimers = [];
+        const el = document.getElementById('action-banner-container');
+        if (el) el.innerHTML = '';
     }
 
     /** Get or create the fixed banner container */
@@ -74,6 +76,7 @@ class MCTimerRenderer {
             if (expiryTime > Date.now()) {
                 const sourceId  = pending.sourcePlayerId || pending.SourcePlayerId;
                 const nopeCount = pending.nopeCount !== undefined ? pending.nopeCount : (pending.NopeCount ?? 0);
+                const cardNames = pending.cardNames || pending.CardNames || 'lá bài';
                 const playerObj = window.lobbyManager?.currentRoom?.players?.find(p => p.playerId === sourceId);
                 const pName     = sourceId === myId ? 'Bạn' : (playerObj?.playerName || 'Người chơi');
                 const isNoped   = nopeCount % 2 !== 0;
@@ -83,7 +86,10 @@ class MCTimerRenderer {
                 banner.className = 'action-banner';
                 banner.innerHTML = `
                     <div class="banner-title">⏱️ ${isNoped ? '🛑 ĐÃ BỊ CHẶN! 🛑' : 'ĐANG CHỜ PHẢN HỒI'}</div>
-                    <div class="banner-subtitle">${pName} vừa dùng bài. Còn vài giây để ném Chặn! (Nope: ${nopeCount})</div>
+                    <div class="banner-subtitle">
+                        <strong>${pName}</strong> vừa đánh: <strong style="color:var(--gold-bright); font-size:14px;">${cardNames}</strong>.<br>
+                        ${isNoped ? 'Hành động đang bị vô hiệu hoá!' : 'Còn vài giây để ném Chặn!'} (Đã Chặn: ${nopeCount} lần)
+                    </div>
                     <div class="progress-container"><div class="progress-bar" id="nope-progress" style="width:100%; background:${barColor}"></div></div>
                 `;
                 bannerContainer.appendChild(banner);
@@ -100,19 +106,42 @@ class MCTimerRenderer {
                 }, 50);
                 this.activeTimers.push(id);
 
-                // Show Nope button if player has one
-                const playerHands = state.playerHands || state.PlayerHands || {};
-                const myHand = playerHands[myId] || [];
-                const nopeCard = myHand.find(c => c.type === 'Nope');
-                // Only non-source players can Nope
-                if (nopeCard && sourceId !== myId) {
+                // Show action buttons (Nope / Pass) for non-source players
+                if (sourceId !== myId) {
+                    const playerHands = state.playerHands || state.PlayerHands || {};
+                    const myHand = playerHands[myId] || [];
+                    const nopeCard = myHand.find(c => c.type === 'Nope');
+
                     const btnWrap = document.createElement('div');
                     btnWrap.className = 'nope-btn-container';
-                    btnWrap.innerHTML = `<button class="btn-nope">🛑 ĐÁNH CHẶN (NOPE)</button>`;
-                    btnWrap.querySelector('.btn-nope').addEventListener('click', () => {
-                        window.signalRService.sendGameAction('play_card', { cardIds: [nopeCard.id] });
-                        btnWrap.remove();
-                    });
+                    btnWrap.style.display = 'flex';
+                    btnWrap.style.gap = '8px';
+                    btnWrap.style.marginTop = '8px';
+
+                    let buttonsHtml = '';
+                    if (nopeCard) {
+                        buttonsHtml += `<button class="btn-nope" id="btn-do-nope">🛑 ĐÁNH CHẶN (NOPE)</button>`;
+                    }
+                    buttonsHtml += `<button class="btn btn-ghost" id="btn-pass-nope" style="background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3); font-size: 13px; padding: 6px 14px;">⏩ Bỏ Qua (Cho Qua)</button>`;
+
+                    btnWrap.innerHTML = buttonsHtml;
+
+                    const doNopeBtn = btnWrap.querySelector('#btn-do-nope');
+                    if (doNopeBtn && nopeCard) {
+                        doNopeBtn.addEventListener('click', () => {
+                            window.signalRService.sendGameAction('play_card', { cardIds: [nopeCard.id] });
+                            btnWrap.remove();
+                        });
+                    }
+
+                    const passNopeBtn = btnWrap.querySelector('#btn-pass-nope');
+                    if (passNopeBtn) {
+                        passNopeBtn.addEventListener('click', () => {
+                            window.signalRService.sendGameAction('resolve_pending_action', {});
+                            btnWrap.remove();
+                        });
+                    }
+
                     bannerContainer.appendChild(btnWrap);
                 }
             }

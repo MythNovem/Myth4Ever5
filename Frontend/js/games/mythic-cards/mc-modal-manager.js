@@ -162,8 +162,8 @@ class MCModalManager {
                 const payload = { cardIds, targetPlayerId };
                 if (cardIds.length === 3) payload.targetCardType = document.getElementById('target-card-type-select').value;
 
-                // Check if it is a Steal card (needs card picker)
-                const isSteal = cardIds.length === 1 && gameState.playerHands[myId]?.find(c => c.id === cardIds[0])?.type === 'Steal';
+                // Check if it is a Steal card OR a 2-card combo (needs face-down card picker)
+                const isSteal = (cardIds.length === 1 && gameState.playerHands[myId]?.find(c => c.id === cardIds[0])?.type === 'Steal') || cardIds.length === 2;
                 if (isSteal) {
                     this.showStealPickerModal(targetPlayerId, cardIds, gameState);
                 } else {
@@ -184,9 +184,10 @@ class MCModalManager {
 
         if (cardCount === 0) { window.lobbyManager.showToast('Mục tiêu không có bài trên tay!', 'warning'); return; }
 
+        const jsonCardIds = JSON.stringify(cardIds).replace(/"/g, '&quot;');
         const cardsHtml = Array.from({length: cardCount}).map((_, i) => `
             <div class="game-card card--hidden" style="cursor:pointer; transform:scale(0.9); margin:-5px;"
-                 onclick="window.mcModalManager.executeSteal('${targetPlayerId}', ${i}, '${cardIds[0]}')">
+                 onclick="window.mcModalManager.executeSteal('${targetPlayerId}', ${i}, ${jsonCardIds})">
                 <span class="card-icon">🎴</span>
                 <span class="card-name">Lá #${i + 1}</span>
             </div>`).join('');
@@ -202,11 +203,57 @@ class MCModalManager {
             </div>`;
     }
 
-    executeSteal(targetPlayerId, targetCardIndex, stealCardId) {
-        window.signalRService.sendGameAction('play_card', { cardIds: [stealCardId], targetPlayerId, targetCardIndex });
+    executeSteal(targetPlayerId, targetCardIndex, cardIds) {
+        const ids = Array.isArray(cardIds) ? cardIds : [cardIds];
+        window.signalRService.sendGameAction('play_card', { cardIds: ids, targetPlayerId, targetCardIndex });
         if (window.soundFX) window.soundFX.play('play');
         if (this._handRenderer) this._handRenderer.clearSelection();
         this.clear();
+    }
+
+    // ─── Steal Result Popup / Animation ──────────────────────────────────────────
+    showStealResultModal(stealInfo, myId) {
+        if (!stealInfo) return;
+        const robberId   = stealInfo.robberId || stealInfo.RobberId;
+        const robberName = stealInfo.robberName || stealInfo.RobberName || 'Người chơi';
+        const victimId   = stealInfo.victimId || stealInfo.VictimId;
+        const victimName = stealInfo.victimName || stealInfo.VictimName || 'Đối thủ';
+        const card       = stealInfo.stolenCard || stealInfo.StolenCard;
+
+        if (!card) return;
+
+        const isRobber = myId === robberId;
+        const isVictim = myId === victimId;
+
+        if (!isRobber && !isVictim) {
+            window.lobbyManager.showToast(`🎁 ${robberName} vừa cướp 1 lá bài của ${victimName}!`, 'info');
+            return;
+        }
+
+        const titleText = isRobber ? '🎁 CƯỚP BÀI THÀNH CÔNG!' : '💔 BẠN ĐÃ BỊ CƯỚP BÀI!';
+        const subtitleText = isRobber
+            ? `Bạn vừa cướp được từ <strong>${victimName}</strong>:`
+            : `<strong>${robberName}</strong> vừa cướp mất lá bài này của bạn:`;
+        const titleColor = isRobber ? 'var(--gold-bright)' : 'var(--crimson-bright)';
+        const btnColor   = isRobber ? '' : 'background: var(--crimson-bright);';
+
+        if (window.soundFX) window.soundFX.play(isRobber ? 'victory' : 'error');
+
+        this._container().innerHTML = `
+            <div class="modal-backdrop" style="z-index: 10000; animation: fadeIn 0.25s ease;">
+                <div class="modal-box" style="text-align: center; border: 2px solid ${titleColor}; max-width: 420px;">
+                    <div style="font-size: 44px; margin-bottom: 4px;">${isRobber ? '🎁' : '💔'}</div>
+                    <div class="modal-title" style="color: ${titleColor}; font-size: 20px;">${titleText}</div>
+                    <div class="modal-subtitle" style="margin: 8px 0 16px;">${subtitleText}</div>
+                    <div class="game-card card--${card.type.toLowerCase()}" style="margin: 0 auto 20px; transform: scale(1.1); cursor: default;">
+                        <span class="card-type-label">${card.type}</span>
+                        <span class="card-icon">${card.icon}</span>
+                        <span class="card-name">${card.name}</span>
+                        <span class="card-desc">${card.description}</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="window.mcModalManager.clear()" style="width: 100%; ${btnColor}">Đã Hiểu</button>
+                </div>
+            </div>`;
     }
 
     // ─── Discard Browser (5-card combo) ─────────────────────────────────────────
@@ -297,6 +344,10 @@ class MCModalManager {
 
         document.getElementById('btn-return-lobby').addEventListener('click', () => {
             this.clear();
+            if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
+            const bannerContainer = document.getElementById('action-banner-container');
+            if (bannerContainer) bannerContainer.innerHTML = '';
+
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('room-view').style.display       = 'block';
             const header = document.querySelector('.app-header');

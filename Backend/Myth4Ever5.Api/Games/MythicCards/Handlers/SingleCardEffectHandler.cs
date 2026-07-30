@@ -38,7 +38,15 @@ public class SingleCardEffectHandler
                 break;
 
             case CardType.Steal:
-                extraData = HandleSteal(room, state, playerId, hand, payload);
+                var stealInfo = HandleSteal(room, state, playerId, hand, payload);
+                if (stealInfo != null)
+                {
+                    return _ctx.CheckGameOverOrContinue(room, state, "card_stolen", new
+                    {
+                        StealInfo = stealInfo,
+                        RoomState = _ctx.SanitizeState(room, state)
+                    });
+                }
                 break;
 
             case CardType.TargetedAttack:
@@ -88,8 +96,18 @@ public class SingleCardEffectHandler
         var stolen = targetHand[stealIdx];
         targetHand.RemoveAt(stealIdx);
         hand.Add(stolen);
-        state.GameLogs.Add($"{room.Players.First(p => p.PlayerId == playerId).PlayerName} đã cướp lá bài thứ {stealIdx + 1} của {target.PlayerName}!");
-        return null;
+
+        var robberName = room.Players.First(p => p.PlayerId == playerId).PlayerName;
+        state.GameLogs.Add($"🎁 {robberName} đã cướp lá {stolen.Name} {stolen.Icon} của {target.PlayerName}!");
+
+        return new
+        {
+            RobberId = playerId,
+            RobberName = robberName,
+            VictimId = target.PlayerId,
+            VictimName = target.PlayerName,
+            StolenCard = stolen
+        };
     }
 
     private void HandleTargetedAttack(RoomModel room, MythicCardsState state, string playerId, JsonElement payload)
