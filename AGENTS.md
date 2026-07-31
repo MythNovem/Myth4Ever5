@@ -23,10 +23,14 @@ Backend (C# .NET 9)
     │   └── Handlers/                     # Card Effect Handlers
     ├── NumberBomb/                       # Game Bom Số 1-100 (2-8 người)
     │   └── NumberBombEngine.cs           # Engine đoán số độc lập
-    └── HexaHive/                         # Game Cờ Lục Giác HexaHive: Bug Tactics (1v1 / Vs Bot AI)
-        ├── HexaHiveEngine.cs             # Engine chính điều phối trận đấu Cờ Lục Giác
-        ├── Models/                       # HexCoord (Tọa độ Axial), HivePiece (8 quân cờ), HexaHiveState
-        └── Services/                     # HiveRulesEngine (BFS Graph Articulation Points) & HiveAiEngine (Bot AI)
+    ├── HexaHive/                         # Game Cờ Lục Giác HexaHive: Bug Tactics (1v1 / Vs Bot AI)
+    │   ├── HexaHiveEngine.cs             # Engine chính điều phối trận đấu Cờ Lục Giác
+    │   ├── Models/                       # HexCoord (Tọa độ Axial), HivePiece, HexaHiveState
+    │   └── Services/                     # HiveRulesEngine & HiveAiEngine (Bot AI)
+    └── MythicRacer/                      # Game Đua Xe F1 Mythic Racer 2D (2-4 người) ⭐ NEW!
+        ├── MythicRacerEngine.cs          # Engine điều phối trận đua xe 2D
+        ├── Models/                       # CarModel, TrackDefinition, ItemBoxModel, MythicRacerState
+        └── Services/                     # RacePhysicsEngine & TrackRegistry (Kho bản đồ F1)
 
 Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 ├── js/
@@ -37,9 +41,8 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 │   └── games/
 │       ├── mythic-cards-renderer.js      # Controller cho Mythic Cards
 │       ├── number-bomb-renderer.js       # Controller cho Game Bom Số
-        └── hexahive-renderer.js          # Controller Canvas 2D cho HexaHive (Pan, Zoom, Glassmorphic GameOver Modal)
-        └── hexahive/
-            └── hexahive-rules-modal.js   # Modal Hướng dẫn luật chơi 3 Tab & 24 thế cờ chiến thuật
+        ├── hexahive-renderer.js          # Controller Canvas 2D cho HexaHive
+        └── mythic-racer-renderer.js      # Controller Canvas 2D cho Mythic Racer 2D (F1 Track, Skid marks, Nitro, Minimap)
 ```
 
 ---
@@ -60,11 +63,10 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 
       public Task<object> StartGameAsync(RoomModel room) { ... }
       public Task<GameActionResult> ProcessActionAsync(RoomModel room, string playerId, string actionType, JsonElement payload) { ... }
+      public object SanitizeStateForBroadcast(RoomModel room, object state) { return state; }
   }
   ```
-- **Lưu ý**: `Program.cs` sẽ **TỰ ĐỘNG** phát hiện và đăng ký Engine mới nhờ Reflection:
-  `typeof(Program).Assembly.GetTypes().Where(t => typeof(IGameEngine)...)`
-  Agent **KHÔNG** cần phải sửa `Program.cs` hay `PartyHub.cs`.
+- **Lưu ý**: `Program.cs` sẽ **TỰ ĐỘNG** phát hiện và đăng ký Engine mới nhờ Reflection. Agent **KHÔNG** cần phải sửa `Program.cs` hay `PartyHub.cs`.
 
 ### Bước 2: Tạo Frontend Renderer (`js/games/your-new-game-renderer.js`)
 - Tạo class `YourNewGameRenderer`:
@@ -85,16 +87,11 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 
 ## ⚡ 3. Các Trạng Thái & Cơ Chế Quan Trọng (Key Game Mechanics)
 
-### 🐝 HexaHive Bug Tactics & Bộ Não AI Bot
-- **One-Hive Rule**: Sử dụng thuật toán BFS đồ thị phát hiện **Articulation Points**. Không được phép di chuyển quân cờ nếu làm đứt gãy tổ ong thành 2 khối rời rạc.
-- **Freedom to Slide Rule**: Căn cổng trượt vật lý trên mặt đất. Quân cờ không thể di chuyển qua cổng kẹt giữa 2 ô liền kề đã có quân.
-- **Pillbug Freeze Rule**: Quân cờ vừa bị dịch chuyển ở lượt trước được gán `ImmobilePieceId` và không thể di chuyển 2 lần liên tiếp.
-- **Bộ Não Bot AI (`HiveAiEngine.cs`)**: Đấu đơn 1v1 với máy, tự động đánh giá điểm số khai cuộc, bảo vệ Ong Chúa 👑 và tấn công dứt điểm.
-
-### Cửa Sổ Phản Hồi Chặn (Nope Window - 5s Countdown)
-- Khi người chơi đánh 1 lá bài có thể bị Chặn trong Mythic Cards, Backend tạo `PendingAction`.
-- Frontend (`mc-timer-renderer.js`) hiển thị banner đếm ngược 5 giây công khai lá bài đang đánh.
-- Người chơi khác có thể ném lá **🛑 Chặn (Nope)** hoặc bấm **⏩ Bỏ Qua (Cho Qua)**.
+### 🏎️ Mythic Racer: Nitro Party 2D
+- **TrackRegistry**: Quản lý bản đồ F1 Grand Prix với khúc cua Hairpins 180°, S-Bends, Checkpoints & lề cỏ làm chậm.
+- **RacePhysicsEngine**: Gia tốc xe, góc bẻ lái, ma sát, va chạm tường, và phạt giảm tốc 55% khi phi ra lề cỏ.
+- **5 Vật phẩm Mario Kart**: Tên lửa đuổi 🚀, Vỏ chuối 360° 🍌, Nitro boost ⚡, Khiên giáp 🛡️, Bom bán kính 💣.
+- **Điều khiển song song**: Bàn Phím PC (`Arrow Keys` / `WASD` + `Space`) & Cảm ứng Mobile.
 
 ---
 
@@ -103,9 +100,6 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 1. **Quy Tắc Git Commit**:
    - **TUYỆT ĐỐI KHÔNG** tự động thực hiện lệnh `git commit`. Chỉ chạy commit khi người dùng đưa ra câu lệnh yêu cầu rõ ràng.
 2. **Chuẩn Hóa Serialization JSON**:
-   - SignalR Backend sử dụng `PropertyNamingPolicy = JsonNamingPolicy.CamelCase`.
-   - Khi truy cập thuộc tính JSON ở Frontend hoặc C# Payload, luôn hỗ trợ cả 2 dạng casing fallback: `data.cardNames || data.CardNames` hoặc `state.immobilePieceId || state.ImmobilePieceId`.
-3. **Địa Chỉ Lắng Nghe IP (Docker/Linux)**:
-   - Trong `Program.cs`, luôn dùng `builder.WebHost.UseUrls($"http://0.0.0.0:{port}")` để tránh lỗi IPv6 socket crash trên container Linux/Render.
-4. **Giữ Sạch DOM Khi Rời Phòng**:
-   - Khi trở về Lobby hoặc rời phòng, luôn gọi `hexahiveRenderer.clear()` / `mcTimerRenderer.clear()` và xóa nội dung container `#game-container` & `#action-banner-container` để tránh đọng lại đếm ngược hoặc modal của ván trước.
+   - SignalR Backend sử dụng `PropertyNamingPolicy = JsonNamingPolicy.CamelCase`. Always support camelCase & PascalCase fallbacks.
+3. **Giữ Sạch DOM Khi Rời Phòng**:
+   - Khi trở về Lobby hoặc rời phòng, luôn gọi `mythicRacerRenderer.clear()` / `hexahiveRenderer.clear()` / `mcTimerRenderer.clear()` để tránh đọng DOM.

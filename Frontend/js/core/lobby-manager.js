@@ -152,11 +152,12 @@ class LobbyManager {
         if (room.isGameStarted) {
             document.getElementById('room-view').style.display = 'none';
         } else {
-            const hasGameOverActive = document.getElementById('hexahive-gameover-popup') || document.getElementById('btn-reopen-gameover');
+            const hasGameOverActive = document.getElementById('hexahive-gameover-popup') || document.getElementById('btn-reopen-gameover') || document.getElementById('racer-gameover-popup') || document.getElementById('btn-reopen-racer');
             if (!hasGameOverActive) {
                 document.getElementById('room-view').style.display = 'block';
                 if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
                 if (window.hexahiveRenderer) window.hexahiveRenderer.clear();
+                if (window.mythicRacerRenderer) window.mythicRacerRenderer.clear();
                 const gameContainer = document.getElementById('game-container');
                 if (gameContainer) {
                     gameContainer.innerHTML = '';
@@ -180,7 +181,8 @@ class LobbyManager {
         const gameMaxPlayers = {
             'mythic_cards': 4,
             'number_bomb': 8,
-            'hexahive': 2
+            'hexahive': 2,
+            'mythic_racer': 4
         };
         const selectedGame = room.selectedGameTypeId || 'mythic_cards';
         const maxPlayers = gameMaxPlayers[selectedGame] || 4;
