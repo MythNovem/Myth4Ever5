@@ -27,6 +27,18 @@ Trò chơi thẻ bài chiến thuật sinh tồn đầy gay cấn! Rút bài, đ
 ### 3. 💣 Bom Số (Secret Number Bomb) (2 - 8 người)
 Trò chơi đoán số đấu trí hồi hộp! Quả bom bí mật nằm ẩn trong khoảng **1 - 100**. Người chơi lần lượt chọn số để bóp chặt khoảng an toàn. Ai đoán trúng số Bom sẽ bị phát nổ và loại khỏi cuộc chơi!
 
+### 4. 🃏 Liar's Deck (Bộ Bài Dối Tráo & Cò Quay Nga) (2 - 4 người)
+Trò chơi đấu trí dối tráo và mạo hiểm kết hợp Cò Quay Nga (Russian Roulette)! Mục tiêu là lừa gạt đối thủ và trở thành người duy nhất còn sống sót.
+- **Bộ bài 20 lá**: 6 lá King (K), 6 lá Queen (Q), 6 lá Ace (A) và 2 lá Joker (Joker là lá vạn năng, luôn tính là hợp lệ/nói thật).
+- **Trang bị & Vòng chơi**: Mỗi người chơi có 1 khẩu súng rulo nạp sẵn 1 viên đạn. Mỗi vòng bàn chơi được gán nhãn (*Bàn King*, *Bàn Queen*, hoặc *Bàn Ace*) và chia 5 lá bài cho mỗi người.
+- **Lượt chơi**: Người chơi đánh úp một số lá bài và tuyên bố khớp với loại Bàn (ví dụ: ở Bàn King, đánh 2 lá và xưng là 2 lá King).
+- **Thách thức (Call out)**: Người kế tiếp có thể lật bài để tố dối tráo:
+  - **Tố đúng (Người đánh nói dối)**: Người đánh bài phải tự bóp cò súng.
+  - **Tố sai (Người đánh nói thật / dùng Joker)**: Người tố phải tự bóp cò súng.
+- **Cò Quay Nga (Russian Roulette)**:
+  - **Súng nổ**: Người bóp cò bị loại ngay lập tức.
+  - **Súng không nổ**: Sống sót và chuyển sang khoang đạn tiếp theo cho các lượt sau.
+
 ---
 
 ## 🏗️ Kiến Trúc Hệ Thống (Architecture)
@@ -105,6 +117,6 @@ Myth4Ever5/
 ```
 
 ---
-asd
+
 ## 📝 Giấy Phép (License)
 Dự án được phân phối dưới giấy phép [MIT License](LICENSE).
