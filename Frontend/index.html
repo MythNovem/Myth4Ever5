@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/mythic-cards.css">
 </head>
+
 <body>
 
     <!-- ===== HEADER ===== -->
@@ -18,7 +20,8 @@
             <span class="logo-sub">Party Lounge</span>
         </div>
         <div class="status-dot" id="connection-status">Đang kết nối...</div>
-        <button id="btn-leave-room" class="btn btn-ghost" style="display: none; padding: 4px 12px; font-size: 12px; border-color: var(--crimson); color: var(--crimson-bright); margin-left: auto;">
+        <button id="btn-leave-room" class="btn btn-ghost"
+            style="display: none; padding: 4px 12px; font-size: 12px; border-color: var(--crimson); color: var(--crimson-bright); margin-left: auto;">
             🔙 Rời Phòng
         </button>
     </header>
@@ -28,7 +31,7 @@
 
         <!-- VIEW 1: Lobby — Create / Join Room -->
         <section id="lobby-view" class="screen active"
-                 style="justify-content:center; align-items:center; padding:32px;">
+            style="justify-content:center; align-items:center; padding:32px;">
 
             <div class="panel lobby-wrap">
                 <h2 style="margin-bottom:4px;">Chào Mừng</h2>
@@ -52,8 +55,8 @@
                 <!-- Name -->
                 <div class="field-group">
                     <label class="field-label" for="player-name-input">Tên Người Chơi</label>
-                    <input type="text" id="player-name-input" class="input-field"
-                           placeholder="VD: Hắc Long" maxlength="16" autocomplete="off">
+                    <input type="text" id="player-name-input" class="input-field" placeholder="VD: Hắc Long"
+                        maxlength="16" autocomplete="off">
                 </div>
 
                 <!-- Create -->
@@ -65,9 +68,8 @@
 
                 <!-- Join -->
                 <div style="display:flex; gap:8px;">
-                    <input type="text" id="room-code-input" class="input-field"
-                           placeholder="Mã phòng (VD: AB3XY7)"
-                           style="text-transform:uppercase; letter-spacing:0.1em; flex:1;">
+                    <input type="text" id="room-code-input" class="input-field" placeholder="Mã phòng (VD: AB3XY7)"
+                        style="text-transform:uppercase; letter-spacing:0.1em; flex:1;">
                     <button id="btn-join-room" class="btn btn-ghost" style="flex-shrink:0;">
                         Vào Phòng
                     </button>
@@ -76,13 +78,13 @@
         </section>
 
         <!-- VIEW 2: Room Lobby — Waiting for players -->
-        <section id="room-view" class="screen"
-                 style="flex-direction:column; align-items:center; padding:32px;">
+        <section id="room-view" class="screen" style="flex-direction:column; align-items:center; padding:32px;">
 
             <div class="panel" style="width:100%; max-width:520px; padding:28px;">
 
                 <!-- Room code -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border-dim);">
+                <div
+                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border-dim);">
                     <div>
                         <div class="caption" style="margin-bottom:4px;">Mã Phòng Chơi</div>
                         <div class="room-code-display" id="display-room-code">——————</div>
@@ -99,13 +101,21 @@
                 <div id="room-player-list" style="margin-bottom:24px;"></div>
 
                 <!-- Game Selection (Host controls) -->
-                <div style="margin-bottom: 20px; padding-top: 16px; border-top: 1px solid var(--border-dim);" id="game-selection-box">
+                <div style="margin-bottom: 20px; padding-top: 16px; border-top: 1px solid var(--border-dim);"
+                    id="game-selection-box">
                     <div class="caption" style="margin-bottom: 8px;">Chọn Trò Chơi</div>
-                    <select id="select-game-type" class="input-field" style="width: 100%; font-size: 14px; background: var(--surface-2); color: var(--gold-bright);">
+                    <select id="select-game-type" class="input-field"
+                        style="width: 100%; font-size: 14px; background: var(--surface-2); color: var(--gold-bright);">
                         <option value="mythic_cards">🎴 Mythic Cards: Trap & Survive (2-4 người)</option>
                         <option value="number_bomb">💣 Bom Số (Secret Bomb 1-100) (2-8 người)</option>
+                        <option value="hexahive">🐝 MythicHive: Bug Tactics (Vương quốc bọ) (2 người)</option>
                     </select>
                 </div>
+
+                <!-- Add Bot (Host) -->
+                <button id="btn-add-bot" class="btn btn-ghost" style="font-size:14px; padding:12px; width:100%; margin-bottom:10px; border-color:var(--violet-mid); color:var(--gold-bright); display:none;">
+                    🤖 Thêm Máy (Bot AI)
+                </button>
 
                 <!-- Start (Host) -->
                 <button id="btn-start-game" class="btn btn-primary" style="font-size:15px; padding:14px; width:100%;">
@@ -113,7 +123,8 @@
                 </button>
 
                 <!-- Ready (Non-Host) -->
-                <button id="btn-toggle-ready" class="btn btn-ghost" style="font-size:15px; padding:14px; width:100%; border-color:var(--emerald); color:var(--emerald-bright); display:none;">
+                <button id="btn-toggle-ready" class="btn btn-ghost"
+                    style="font-size:15px; padding:14px; width:100%; border-color:var(--emerald); color:var(--emerald-bright); display:none;">
                     ✅ Sẵn Sàng
                 </button>
             </div>
@@ -137,17 +148,19 @@
 
         <!-- Chat Input -->
         <div class="chat-input-wrap">
-            <input type="text" id="chat-input" class="input-field"
-                   placeholder="Nhắn gì đó với cả phòng..."
-                   style="font-size:13px;">
+            <input type="text" id="chat-input" class="input-field" placeholder="Nhắn gì đó với cả phòng..."
+                style="font-size:13px;">
             <button class="chat-send-btn" id="btn-send-chat">Gửi</button>
         </div>
     </footer>
 
     <!-- Chat Messages Floating Panel (Closed by default) -->
     <div class="panel chat-panel collapsed" id="chat-panel">
-        <div class="chat-panel-label" id="chat-toggle" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <span>💬 Chat <span id="unread-chat-dot" style="display:none; color:var(--crimson-bright); font-size:10px; font-weight:bold; margin-left:4px;">● Tin mới</span></span>
+        <div class="chat-panel-label" id="chat-toggle"
+            style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <span>💬 Chat <span id="unread-chat-dot"
+                    style="display:none; color:var(--crimson-bright); font-size:10px; font-weight:bold; margin-left:4px;">●
+                    Tin mới</span></span>
             <span id="chat-toggle-icon">▲</span>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
@@ -162,7 +175,7 @@
     <script src="js/core/lobby-manager.js"></script>
     <script src="js/core/sound-fx.js"></script>
     <script src="js/core/game-loader.js"></script>
-    
+
     <!-- MythicCards Sub-Modules -->
     <script src="js/games/mythic-cards/mc-seat-renderer.js"></script>
     <script src="js/games/mythic-cards/mc-hand-renderer.js"></script>
@@ -171,6 +184,8 @@
     <script src="js/games/mythic-cards/mc-rules-modal.js"></script>
     <script src="js/games/mythic-cards-renderer.js"></script>
     <script src="js/games/number-bomb-renderer.js"></script>
+    <script src="js/games/hexahive/hexahive-rules-modal.js"></script>
+    <script src="js/games/hexahive-renderer.js"></script>
 
     <script>
         // Init Audio on first interaction
@@ -203,8 +218,8 @@
 
             // Kết nối SignalR C# Backend (Hỗ trợ cả môi trường Dev ở máy và Deploy)
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const backendUrl = isLocal 
-                ? 'http://localhost:5000/hubs/party' 
+            const backendUrl = isLocal
+                ? 'http://localhost:5000/hubs/party'
                 : 'https://myth4ever5-backend.onrender.com/hubs/party';
 
             const connected = await window.signalRService.init(backendUrl);
@@ -214,13 +229,13 @@
                 statusEl.textContent = 'Online';
                 statusEl.style.color = 'var(--emerald-bright)';
 
-                window.signalRService.on('RoomStateUpdated',    (room) => window.lobbyManager.renderRoomState(room));
-                window.signalRService.on('GameStarted',         (gameTypeId, data) => window.gameLoader.loadGame(gameTypeId, data));
+                window.signalRService.on('RoomStateUpdated', (room) => window.lobbyManager.renderRoomState(room));
+                window.signalRService.on('GameStarted', (gameTypeId, data) => window.gameLoader.loadGame(gameTypeId, data));
                 window.signalRService.on('GameActionBroadcast', (actionType, data) => window.gameLoader.handleAction(actionType, data));
-                window.signalRService.on('GameOver',            (wId, wName, sum) => window.gameLoader.handleGameOver(wId, wName, sum));
-                window.signalRService.on('ReceiveChatMessage',  (sId, sName, sAv, msg, time) => window.lobbyManager.appendChatMessage(sName, sAv, msg, time));
-                window.signalRService.on('ReceiveEmojiReaction',(sId, sName, emoji) => window.lobbyManager.spawnFloatingEmoji(emoji, sName));
-                window.signalRService.on('ErrorNotification',   (err) => {
+                window.signalRService.on('GameOver', (wId, wName, sum) => window.gameLoader.handleGameOver(wId, wName, sum));
+                window.signalRService.on('ReceiveChatMessage', (sId, sName, sAv, msg, time) => window.lobbyManager.appendChatMessage(sName, sAv, msg, time));
+                window.signalRService.on('ReceiveEmojiReaction', (sId, sName, emoji) => window.lobbyManager.spawnFloatingEmoji(emoji, sName));
+                window.signalRService.on('ErrorNotification', (err) => {
                     window.lobbyManager.showToast(err, 'danger');
                     if (err === "Không tìm thấy phòng chơi!" || err === "Bạn không thuộc phòng này!") {
                         window.lobbyManager.clearRoomState();
@@ -240,4 +255,5 @@
         });
     </script>
 </body>
+
 </html>

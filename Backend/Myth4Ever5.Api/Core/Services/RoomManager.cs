@@ -35,7 +35,7 @@ public class RoomManager
         return room;
     }
 
-    public (bool Success, string Message, RoomModel? Room) JoinRoom(string roomCode, string playerId, string connectionId, string playerName, string avatarUrl)
+    public (bool Success, string Message, RoomModel? Room) JoinRoom(string roomCode, string playerId, string connectionId, string playerName, string avatarUrl, int maxPlayers = 4)
     {
         roomCode = roomCode.Trim().ToUpper();
         if (!_rooms.TryGetValue(roomCode, out var room))
@@ -48,9 +48,9 @@ public class RoomManager
             return (false, "Phòng này đã bắt đầu game!", null);
         }
 
-        if (room.Players.Count >= 4)
+        if (room.Players.Count >= maxPlayers)
         {
-            return (false, "Phòng đã đầy (tối đa 4 người)!", null);
+            return (false, $"Phòng đã đầy (tối đa {maxPlayers} người cho game này)!", null);
         }
 
         var existingPlayer = room.Players.FirstOrDefault(p => p.PlayerId == playerId);
@@ -92,6 +92,77 @@ public class RoomManager
                 player.IsConnected = false;
             }
         }
+    }
+
+    public (bool Success, string Message, PlayerModel? BotPlayer) AddBotPlayer(string roomCode, int maxPlayers = 4)
+    {
+        if (!_rooms.TryGetValue(roomCode.Trim().ToUpper(), out var room))
+        {
+            return (false, "Không tìm thấy phòng chơi!", null);
+        }
+
+        if (room.IsGameStarted)
+        {
+            return (false, "Phòng này đã bắt đầu game!", null);
+        }
+
+        if (room.Players.Count >= maxPlayers)
+        {
+            return (false, $"Phòng đã đủ số người tối đa ({maxPlayers} người) cho trò chơi này!", null);
+        }
+
+        int botIndex = room.Players.Count(p => p.IsBot) + 1;
+        string botId = $"bot_{Guid.NewGuid().ToString("N")[..6]}";
+        var botPlayer = new PlayerModel
+        {
+            PlayerId = botId,
+            ConnectionId = $"conn_{botId}",
+            PlayerName = $"🤖 Bot Máy #{botIndex}",
+            AvatarUrl = "🤖",
+            IsHost = false,
+            IsReady = true,
+            IsConnected = true,
+            IsBot = true
+        };
+
+        room.Players.Add(botPlayer);
+        _playerToRoom[botId] = roomCode;
+
+        return (true, "Đã thêm Bot Máy thành công", botPlayer);
+    }
+
+    public (bool Success, string Message, PlayerModel? KickedPlayer) KickPlayer(string roomCode, string hostConnectionId, string targetPlayerId)
+    {
+        if (!_rooms.TryGetValue(roomCode.Trim().ToUpper(), out var room))
+        {
+            return (false, "Không tìm thấy phòng chơi!", null);
+        }
+
+        if (room.IsGameStarted)
+        {
+            return (false, "Không thể đuổi người chơi khi game đang diễn ra!", null);
+        }
+
+        if (room.HostConnectionId != hostConnectionId)
+        {
+            return (false, "Chỉ Chủ phòng mới có quyền đuổi người chơi!", null);
+        }
+
+        var targetPlayer = room.Players.FirstOrDefault(p => p.PlayerId == targetPlayerId);
+        if (targetPlayer == null)
+        {
+            return (false, "Không tìm thấy người chơi này!", null);
+        }
+
+        if (targetPlayer.IsHost)
+        {
+            return (false, "Không thể tự đuổi Chủ phòng!", null);
+        }
+
+        room.Players.Remove(targetPlayer);
+        _playerToRoom.TryRemove(targetPlayerId, out _);
+
+        return (true, "Đã đuổi người chơi ra khỏi phòng thành công!", targetPlayer);
     }
 
     public (RoomModel? Room, PlayerModel? LeftPlayer) LeaveRoomExplicit(string playerId)

@@ -11,34 +11,35 @@ Dự án áp dụng mô hình **Single Page Application (SPA) + SignalR WebSocke
 ```text
 Backend (C# .NET 9)
 ├── Core/
-│   ├── Hubs/PartyHub.cs                  # WebSocket entry point (Host & Player Actions)
-│   ├── Services/RoomManager.cs           # Quản lý phòng, session người chơi, trạng thái Ready Check
+│   ├── Hubs/PartyHub.cs                  # WebSocket entry point (Host & Player Actions, AddBot, KickPlayer)
+│   ├── Services/RoomManager.cs           # Quản lý phòng, session người chơi, trạng thái Ready Check, Kick, AddBot
 │   ├── Services/GameEngineFactory.cs     # Tự động phát hiện & đăng ký Game Engines via Reflection
 │   └── Interfaces/IGameEngine.cs         # Contract chung cho mọi trò chơi
 └── Games/
-    ├── MythicCards/                      # Game Mèo Ma Quái
+    ├── MythicCards/                      # Game Mèo Ma Quái (2-4 người)
     │   ├── MythicCardsEngine.cs          # Master Orchestration
     │   ├── Models/MythicCardsState.cs    # Game State (Deck, Hands, DiscardPile, PendingAction)
     │   ├── Services/                     # MythicCardsDeckBuilder & Context
-    │   └── Handlers/                     # Card Effect Handlers (Draw, Play, Single, Combo, Exploding, Resolve)
-    └── NumberBomb/                       # Game Bom Số (1-100)
-        └── NumberBombEngine.cs           # Engine đoán số độc lập
+    │   └── Handlers/                     # Card Effect Handlers
+    ├── NumberBomb/                       # Game Bom Số 1-100 (2-8 người)
+    │   └── NumberBombEngine.cs           # Engine đoán số độc lập
+    └── HexaHive/                         # Game Cờ Lục Giác HexaHive: Bug Tactics (1v1 / Vs Bot AI)
+        ├── HexaHiveEngine.cs             # Engine chính điều phối trận đấu Cờ Lục Giác
+        ├── Models/                       # HexCoord (Tọa độ Axial), HivePiece (8 quân cờ), HexaHiveState
+        └── Services/                     # HiveRulesEngine (BFS Graph Articulation Points) & HiveAiEngine (Bot AI)
 
-Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS)
+Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS + HTML5 Canvas 2D)
 ├── js/
 │   ├── core/
-│   │   ├── lobby-manager.js              # Quản lý phòng chờ, tạo/vào phòng, Ready Check, chọn Game
+│   │   ├── lobby-manager.js              # Quản lý phòng chờ, chọn Game, Đuổi người chơi, Thêm Bot AI
 │   │   ├── signalr-service.js            # Wrapper kết nối WebSocket với SignalR Hub
 │   │   └── sound-fx.js                   # Web Audio API sound generator
 │   └── games/
-│       ├── mythic-cards-renderer.js      # Main Controller cho Mythic Cards
-│       ├── mythic-cards/                 # Submodule renderers
-│       │   ├── mc-seat-renderer.js       # Vẽ vị trí người chơi quanh bàn
-│       │   ├── mc-hand-renderer.js       # Vẽ bài trên tay & quản lý chọn card/combo
-│       │   ├── mc-timer-renderer.js      # Banner đếm ngược 5s cửa sổ Chặn (Nope) + Bom nổ
-│       │   ├── mc-modal-manager.js       # Quản lý Modals (Cướp bài, Xin bài, Tương lai, Thắng/Thua)
-│       │   └── mc-rules-modal.js         # Modal bảng luật chơi
-│       └── number-bomb-renderer.js       # Controller & UI cho Game Bom Số
+│       ├── mythic-cards-renderer.js      # Controller cho Mythic Cards
+│       ├── number-bomb-renderer.js       # Controller cho Game Bom Số
+        └── hexahive-renderer.js          # Controller Canvas 2D cho HexaHive (Pan, Zoom, Glassmorphic GameOver Modal)
+        └── hexahive/
+            └── hexahive-rules-modal.js   # Modal Hướng dẫn luật chơi 3 Tab & 24 thế cờ chiến thuật
 ```
 
 ---
@@ -84,28 +85,16 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS)
 
 ## ⚡ 3. Các Trạng Thái & Cơ Chế Quan Trọng (Key Game Mechanics)
 
-### Cửa Sổ Phản Hồi Chặn (Nope Window - 5s Countdown)
-- Khi người chơi đánh 1 lá bài có thể bị Chặn, Backend tạo `PendingAction`:
-  ```csharp
-  state.CurrentPendingAction = new PendingAction {
-      SourcePlayerId = playerId,
-      ActionType = "play_card",
-      Payload = payload,
-      ExpiryTime = DateTime.UtcNow.AddSeconds(5),
-      NopeCount = 0,
-      CardNames = "Nhìn Tương Lai 👁️"
-  };
-  ```
-- Frontend (`mc-timer-renderer.js`) hiển thị banner đếm ngược 5 giây công khai lá bài đang đánh.
-- Người chơi khác có thể:
-  1. Bấm **🛑 ĐÁNH CHẶN (NOPE)** (nếu có lá Nope).
-  2. Bấm **⏩ Bỏ Qua (Cho Qua)** ➔ Gửi action `resolve_pending_action` lên server để thực thi hiệu ứng ngay mà không cần chờ đếm ngược.
+### 🐝 HexaHive Bug Tactics & Bộ Não AI Bot
+- **One-Hive Rule**: Sử dụng thuật toán BFS đồ thị phát hiện **Articulation Points**. Không được phép di chuyển quân cờ nếu làm đứt gãy tổ ong thành 2 khối rời rạc.
+- **Freedom to Slide Rule**: Căn cổng trượt vật lý trên mặt đất. Quân cờ không thể di chuyển qua cổng kẹt giữa 2 ô liền kề đã có quân.
+- **Pillbug Freeze Rule**: Quân cờ vừa bị dịch chuyển ở lượt trước được gán `ImmobilePieceId` và không thể di chuyển 2 lần liên tiếp.
+- **Bộ Não Bot AI (`HiveAiEngine.cs`)**: Đấu đơn 1v1 với máy, tự động đánh giá điểm số khai cuộc, bảo vệ Ong Chúa 👑 và tấn công dứt điểm.
 
-### Quy Trình Xin Bài (Favor 🙏)
-- Đánh lá Xin Xỏ bắt buộc phải kèm `targetPlayerId`.
-- Khi cửa sổ Chặn trôi qua mà không bị Chặn, server chuyển sang trạng thái:
-  `state.AwaitingFavorResponse = true;`
-- Frontend đối thủ tự động bật `showFavorModal` ép đối thủ chọn 1 lá bài nộp cho người xin bài.
+### Cửa Sổ Phản Hồi Chặn (Nope Window - 5s Countdown)
+- Khi người chơi đánh 1 lá bài có thể bị Chặn trong Mythic Cards, Backend tạo `PendingAction`.
+- Frontend (`mc-timer-renderer.js`) hiển thị banner đếm ngược 5 giây công khai lá bài đang đánh.
+- Người chơi khác có thể ném lá **🛑 Chặn (Nope)** hoặc bấm **⏩ Bỏ Qua (Cho Qua)**.
 
 ---
 
@@ -115,8 +104,8 @@ Frontend (Vanilla JS ES6 Modules + Glassmorphism CSS)
    - **TUYỆT ĐỐI KHÔNG** tự động thực hiện lệnh `git commit`. Chỉ chạy commit khi người dùng đưa ra câu lệnh yêu cầu rõ ràng.
 2. **Chuẩn Hóa Serialization JSON**:
    - SignalR Backend sử dụng `PropertyNamingPolicy = JsonNamingPolicy.CamelCase`.
-   - Khi truy cập thuộc tính JSON ở Frontend hoặc C# Payload, luôn hỗ trợ cả 2 dạng casing fallback: `data.cardNames || data.CardNames`.
+   - Khi truy cập thuộc tính JSON ở Frontend hoặc C# Payload, luôn hỗ trợ cả 2 dạng casing fallback: `data.cardNames || data.CardNames` hoặc `state.immobilePieceId || state.ImmobilePieceId`.
 3. **Địa Chỉ Lắng Nghe IP (Docker/Linux)**:
    - Trong `Program.cs`, luôn dùng `builder.WebHost.UseUrls($"http://0.0.0.0:{port}")` để tránh lỗi IPv6 socket crash trên container Linux/Render.
 4. **Giữ Sạch DOM Khi Rời Phòng**:
-   - Khi trở về Lobby hoặc rời phòng, luôn gọi `mcTimerRenderer.clear()` và xóa nội dung container `#action-banner-container` để tránh đọng lại đếm ngược hoặc modal của ván trước.
+   - Khi trở về Lobby hoặc rời phòng, luôn gọi `hexahiveRenderer.clear()` / `mcTimerRenderer.clear()` và xóa nội dung container `#game-container` & `#action-banner-container` để tránh đọng lại đếm ngược hoặc modal của ván trước.
