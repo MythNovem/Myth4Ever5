@@ -115,16 +115,35 @@ class HexaHiveRulesModal {
                     <div id="tab-strategy" class="tab-pane" style="display: none;">
                         <div style="display: flex; flex-direction: column; gap: 12px;">
                             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border-left: 3px solid #fbbf24;">
-                                <h4 style="margin: 0 0 4px 0; color: #fbbf24;">💡 Mẹo 1: Khóa 👑 Ong Chúa Bằng 🪲 Bọ Cánh Cứng</h4>
-                                <p style="margin: 0;">Khi Bọ Cánh Cứng trèo lên trên Ong Chúa đối thủ, nó khóa Ong Chúa không thể di chuyển và biến ô đó thành màu quân mình để dễ đặt quân tấn công tiếp giáp!</p>
+                                <h4 style="margin: 0 0 4px 0; color: #fbbf24;">🎯 THẾ CỜ & KHÁI NIỆM CHIẾN THUẬT ĐỈNH CAO (HIVE MASTER STRATEGIES)</h4>
+                                <p style="margin: 0; font-size: 13px; color: #e2e8f0;">Hệ thống game HexaHive đã hỗ trợ & thực thi toàn bộ 24 thế cờ nâng cao chuẩn quốc tế:</p>
                             </div>
-                            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border-left: 3px solid #38bdf8;">
-                                <h4 style="margin: 0 0 4px 0; color: #38bdf8;">💡 Mẹo 2: Giữ 🐜 Kiến Làm Quân Cơ Động</h4>
-                                <p style="margin: 0;">Kiến là quân mạnh nhất để di chuyển bao vây ô trống cuối cùng của Ong Chúa đối phương. Đừng vội đặt Kiến ở vị trí bị kẹt!</p>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border-left: 3px solid #4ade80;">
-                                <h4 style="margin: 0 0 4px 0; color: #4ade80;">💡 Mẹo 3: Thủ Thuật Pinning (Khóa Nước Đi)</h4>
-                                <p style="margin: 0;">Đặt quân cờ sát quân đối thủ sao cho nếu đối thủ rút quân đó ra sẽ làm vỡ tổ ong -> Ép quân đối thủ đứng yên vĩnh viễn!</p>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px;">
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">1. True Pin (Khóa Cương Quyết):</strong> Bắt quân đối thủ đứng yên vì nếu di chuyển sẽ vi phạm One-Hive Rule.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">2. False Pin (Khóa Ảo):</strong> Tưởng như bị gài nhưng khi gài thêm quân khác thì quân đó tự do di chuyển.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">3. Double Beetle Attack:</strong> Dùng 2 Bọ Cánh Cứng 🪲 trèo đè liên tiếp đè nát Ong Chúa.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">4. Ant Farm (Nông Trại Kiến):</strong> Đóng chiếm viền ngoài bằng 2-3 Kiến 🐜 để làm chủ hoàn toàn bàn cờ.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">5. Direct Drop:</strong> Đặt quân mới áp sát ngay Ong Chúa đối phương để tạo sức ép tức thì.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">6. Proximity Pillbug Attack:</strong> Dùng Bọ Cuộn 🛡️ áp sát quăng quân vệ sĩ của đối thủ đi chỗ khác.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">7. Choking the Queen:</strong> Bao vây siết chặt 5/6 ô xung quanh Ong Chúa để dứt điểm.
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 8px;">
+                                    <strong style="color: #fbbf24;">8. Mosquito Shutdown:</strong> Rút Muỗi 🦟 khỏi vị trí tiếp xúc quân nguy hiểm để triệt hạ sức mạnh đối thủ.
+                                </div>
                             </div>
                         </div>
                     </div>

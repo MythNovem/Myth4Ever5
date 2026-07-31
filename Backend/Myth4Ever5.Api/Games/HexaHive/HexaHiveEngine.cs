@@ -60,6 +60,9 @@ public class HexaHiveEngine : IGameEngine
             case "pass_turn":
                 return HandlePassTurn(room, state, playerId, currentPlayer);
 
+            case "surrender":
+                return HandleSurrender(room, state, playerId, currentPlayer);
+
             default:
                 return Task.FromResult(new GameActionResult { Success = false, Message = "Hành động không hợp lệ!" });
         }
@@ -243,6 +246,28 @@ public class HexaHiveEngine : IGameEngine
         }
 
         return hand;
+    }
+
+    private Task<GameActionResult> HandleSurrender(RoomModel room, HexaHiveState state, string playerId, PlayerModel currentPlayer)
+    {
+        var opponent = room.Players.FirstOrDefault(p => p.PlayerId != playerId);
+        string winnerId = opponent?.PlayerId ?? "";
+        string winnerName = opponent?.PlayerName ?? "Đối thủ";
+
+        state.WinnerPlayerId = winnerId;
+        state.WinnerName = winnerName;
+        state.IsDraw = false;
+        state.GameLogs.Add($"🏳️ {currentPlayer.PlayerName} đã xin đầu hàng! Chiến thắng thuộc về {winnerName}!");
+
+        return Task.FromResult(new GameActionResult
+        {
+            Success = true,
+            ActionType = "surrender",
+            IsGameOver = true,
+            WinnerId = winnerId,
+            WinnerName = winnerName,
+            Data = SanitizeStateForBroadcast(room, state)
+        });
     }
 
     public object SanitizeStateForBroadcast(RoomModel room, object genericState)

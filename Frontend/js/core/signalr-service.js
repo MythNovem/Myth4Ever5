@@ -45,7 +45,7 @@ class SignalRService {
         const events = [
             'PlayerJoined', 'PlayerLeft', 'RoomStateUpdated', 
             'GameStarted', 'GameActionBroadcast', 'GameOver', 
-            'ReceiveChatMessage', 'ReceiveEmojiReaction', 'ErrorNotification'
+            'ReceiveChatMessage', 'ReceiveEmojiReaction', 'PlayerKicked', 'ErrorNotification'
         ];
 
         events.forEach(eventName => {
@@ -86,6 +86,14 @@ class SignalRService {
 
     async toggleReady() {
         return this.connection.invoke('ToggleReady');
+    }
+
+    async addBot() {
+        return this.connection.invoke('AddBot');
+    }
+
+    async kickPlayer(targetPlayerId) {
+        return this.connection.invoke('KickPlayer', targetPlayerId);
     }
 
     async startGame() {

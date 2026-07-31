@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.SignalR;
 using Myth4Ever5.Api.Core.Interfaces;
 using Myth4Ever5.Api.Core.Models;
 using Myth4Ever5.Api.Core.Services;
+using Myth4Ever5.Api.Games.HexaHive.Models;
+using Myth4Ever5.Api.Games.HexaHive.Services;
 
 public class PartyHub : Hub<IPartyClient>
 {
@@ -27,7 +29,15 @@ public class PartyHub : Hub<IPartyClient>
 
     public async Task JoinRoom(string roomCode, string playerId, string playerName, string avatarUrl)
     {
-        var result = _roomManager.JoinRoom(roomCode, playerId, Context.ConnectionId, playerName, avatarUrl);
+        var existingRoom = _roomManager.GetRoom(roomCode);
+        int maxPlayers = 4;
+        if (existingRoom != null)
+        {
+            var engine = _engineFactory.GetEngine(existingRoom.SelectedGameTypeId);
+            if (engine != null) maxPlayers = engine.MaxPlayers;
+        }
+
+        var result = _roomManager.JoinRoom(roomCode, playerId, Context.ConnectionId, playerName, avatarUrl, maxPlayers);
         if (!result.Success || result.Room == null)
         {
             await Clients.Caller.ErrorNotification(result.Message);
@@ -58,7 +68,6 @@ public class PartyHub : Hub<IPartyClient>
             return;
         }
 
-        // Cập nhật lại ConnectionId mới
         existingPlayer.ConnectionId = Context.ConnectionId;
         existingPlayer.IsConnected = true;
         
@@ -68,7 +77,6 @@ public class PartyHub : Hub<IPartyClient>
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, room.RoomCode);
-        
         await Clients.Group(room.RoomCode).RoomStateUpdated(room);
         
         if (room.IsGameStarted)
@@ -105,6 +113,14 @@ public class PartyHub : Hub<IPartyClient>
         }
 
         room.SelectedGameTypeId = gameTypeId;
+        if (gameTypeId != "hexahive")
+        {
+            var botPlayers = room.Players.Where(p => p.IsBot).ToList();
+            foreach (var bot in botPlayers)
+            {
+                _roomManager.KickPlayer(room.RoomCode, room.HostConnectionId, bot.PlayerId);
+            }
+        }
         await Clients.Group(room.RoomCode).RoomStateUpdated(room);
     }
 
@@ -118,6 +134,58 @@ public class PartyHub : Hub<IPartyClient>
 
         player.IsReady = !player.IsReady;
         await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+    }
+
+    public async Task AddBot()
+    {
+        var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);
+        if (room == null || room.IsGameStarted) return;
+
+        if (room.SelectedGameTypeId != "hexahive")
+        {
+            await Clients.Caller.ErrorNotification("🤖 Bot AI hiện tại chỉ hỗ trợ trò chơi 🐝 HexaHive: Bug Tactics!");
+            return;
+        }
+
+        var player = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (player == null || !player.IsHost) return;
+
+        var engine = _engineFactory.GetEngine(room.SelectedGameTypeId);
+        int maxPlayers = engine?.MaxPlayers ?? 4;
+
+        var result = _roomManager.AddBotPlayer(room.RoomCode, maxPlayers);
+        if (result.Success)
+        {
+            await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+        }
+        else
+        {
+            await Clients.Caller.ErrorNotification(result.Message);
+        }
+    }
+
+    public async Task KickPlayer(string targetPlayerId)
+    {
+        var room = _roomManager.GetRoomByConnectionId(Context.ConnectionId);
+        if (room == null) return;
+
+        var result = _roomManager.KickPlayer(room.RoomCode, Context.ConnectionId, targetPlayerId);
+        if (result.Success && result.KickedPlayer != null)
+        {
+            var kicked = result.KickedPlayer;
+            if (!kicked.IsBot && !string.IsNullOrEmpty(kicked.ConnectionId))
+            {
+                await Clients.Client(kicked.ConnectionId).PlayerKicked("Bạn đã bị Chủ phòng mời ra khỏi phòng!");
+                await Groups.RemoveFromGroupAsync(kicked.ConnectionId, room.RoomCode);
+            }
+
+            await Clients.Group(room.RoomCode).PlayerLeft(kicked.ConnectionId, room.Players);
+            await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+        }
+        else
+        {
+            await Clients.Caller.ErrorNotification(result.Message);
+        }
     }
 
     public async Task StartGame()
@@ -161,6 +229,19 @@ public class PartyHub : Hub<IPartyClient>
 
         await Clients.Group(room.RoomCode).GameStarted(engine.GameTypeId, initialData);
         await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+
+        if (room.GameState is HexaHiveState hState)
+        {
+            var startingP = room.Players[hState.CurrentTurnIndex];
+            if (startingP.IsBot)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(800);
+                    await ProcessBotTurnAsync(room);
+                });
+            }
+        }
     }
 
     public async Task SendGameAction(string actionType, JsonElement payload)
@@ -194,9 +275,72 @@ public class PartyHub : Hub<IPartyClient>
         if (result.IsGameOver)
         {
             room.IsGameStarted = false;
-            foreach (var p in room.Players.Where(p => !p.IsHost)) p.IsReady = false;
+            foreach (var p in room.Players.Where(p => !p.IsHost && !p.IsBot)) p.IsReady = false;
             await Clients.Group(room.RoomCode).GameOver(result.WinnerId ?? "", result.WinnerName ?? "Vô danh", result.Data ?? new { });
             await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+        }
+        else if (room.GameState is HexaHiveState hState)
+        {
+            var nextP = room.Players[hState.CurrentTurnIndex];
+            if (nextP.IsBot)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(800);
+                    await ProcessBotTurnAsync(room);
+                });
+            }
+        }
+    }
+
+    private async Task ProcessBotTurnAsync(RoomModel room)
+    {
+        if (!room.IsGameStarted || room.GameState is not HexaHiveState state) return;
+
+        var botPlayer = room.Players[state.CurrentTurnIndex];
+        if (!botPlayer.IsBot) return;
+
+        var choice = HiveAiEngine.CalculateBestMove(state, botPlayer.PlayerId, room.Players);
+
+        JsonElement payload;
+        if (choice.ActionType == "place_piece")
+        {
+            payload = JsonSerializer.SerializeToElement(new { pieceId = choice.PieceId, q = choice.TargetCoord.Q, r = choice.TargetCoord.R });
+        }
+        else if (choice.ActionType == "move_piece")
+        {
+            payload = JsonSerializer.SerializeToElement(new { fromQ = choice.FromCoord.Q, fromR = choice.FromCoord.R, toQ = choice.TargetCoord.Q, toR = choice.TargetCoord.R });
+        }
+        else
+        {
+            payload = JsonSerializer.SerializeToElement(new { });
+        }
+
+        var engine = _engineFactory.GetEngine(room.SelectedGameTypeId);
+        if (engine == null) return;
+
+        var result = await engine.ProcessActionAsync(room, botPlayer.PlayerId, choice.ActionType, payload);
+        if (!result.Success) return;
+
+        await Clients.Group(room.RoomCode).GameActionBroadcast(result.ActionType, result.Data ?? new { });
+
+        if (result.IsGameOver)
+        {
+            room.IsGameStarted = false;
+            foreach (var p in room.Players.Where(p => !p.IsHost && !p.IsBot)) p.IsReady = false;
+            await Clients.Group(room.RoomCode).GameOver(result.WinnerId ?? "", result.WinnerName ?? "Vô danh", result.Data ?? new { });
+            await Clients.Group(room.RoomCode).RoomStateUpdated(room);
+        }
+        else
+        {
+            if (room.Players[state.CurrentTurnIndex].IsBot)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(800);
+                    await ProcessBotTurnAsync(room);
+                });
+            }
         }
     }
 

@@ -11,6 +11,7 @@ class HexaHiveRenderer {
         this.room = null;
         this.state = null;
         this.myPlayerId = '';
+        this.isGameOverModalShown = false;
 
         // Viewport camera
         this.hexRadius = 38;
@@ -33,6 +34,7 @@ class HexaHiveRenderer {
     }
 
     init(initialData) {
+        this.isGameOverModalShown = false;
         if (!this.rulesModal && window.HexaHiveRulesModal) {
             this.rulesModal = new window.HexaHiveRulesModal();
         }
@@ -77,8 +79,10 @@ class HexaHiveRenderer {
                     <div class="header-center">
                         <div id="turn-status-msg" class="turn-status" style="font-size: 15px; font-weight: 600;">Đang chờ...</div>
                     </div>
-                    <div class="header-right" style="display: flex; gap: 10px;">
-                        <button id="btn-hexahive-rules" class="btn btn-ghost" style="font-size: 13px;">❓ Hướng Dẫn Luật</button>
+                    <div class="header-right" style="display: flex; gap: 8px;">
+                        <button id="btn-hexahive-rules" class="btn btn-ghost" style="font-size: 13px;">❓ Luật Chơi</button>
+                        <button id="btn-hexahive-surrender" class="btn btn-ghost" style="font-size: 13px; color: #f43f5e; border-color: #f43f5e;">🏳️ Đầu Hàng</button>
+                        <button id="btn-hexahive-leave" class="btn btn-ghost" style="font-size: 13px; color: #a78bfa; border-color: #8b5cf6;">🚪 Rời Phòng</button>
                         <button id="btn-hexahive-pass" class="btn btn-ghost hidden" style="font-size: 13px; color: #ef4444; border-color: #ef4444;">⏩ Bỏ Qua Lượt</button>
                     </div>
                 </div>
@@ -154,7 +158,7 @@ class HexaHiveRenderer {
         const winnerId = state.winnerPlayerId || state.WinnerPlayerId;
         const isDraw = state.isDraw || state.IsDraw;
 
-        if (winnerId || isDraw) {
+        if ((winnerId || isDraw) && !this.isGameOverModalShown) {
             this.showGameOverModal(state);
         }
     }
@@ -179,7 +183,7 @@ class HexaHiveRenderer {
         }
 
         if (passBtn) {
-            passBtn.classList.toggle('hidden', !isMyTurn);
+            passBtn.classList.add('hidden');
         }
     }
 
@@ -307,10 +311,271 @@ class HexaHiveRenderer {
         });
     }
 
+    checkOneHiveRule(fromCoord) {
+        const board = this.state?.board || this.state?.Board;
+        if (!board) return true;
+
+        const fromKey = `${fromCoord.q},${fromCoord.r}`;
+        const stack = board[fromKey];
+        if (!stack || stack.length === 0) return true;
+
+        if (stack.length > 1) return true;
+
+        const activeKeys = Object.keys(board).filter(k => k !== fromKey && board[k] && board[k].length > 0);
+        if (activeKeys.length <= 1) return true;
+
+        const activeSet = new Set(activeKeys);
+        const startKey = activeKeys[0];
+        const visited = new Set([startKey]);
+        const queue = [startKey];
+
+        while (queue.length > 0) {
+            const currKey = queue.shift();
+            const [cq, cr] = currKey.split(',').map(Number);
+            this.getHexNeighbors({ q: cq, r: cr }).forEach(n => {
+                const nKey = `${n.q},${n.r}`;
+                if (activeSet.has(nKey) && !visited.has(nKey)) {
+                    visited.add(nKey);
+                    queue.push(nKey);
+                }
+            });
+        }
+
+        return visited.size === activeKeys.length;
+    }
+
+    canSlideGround(fromCoord, toCoord) {
+        const board = this.state?.board || this.state?.Board;
+        if (!board) return true;
+
+        const fromNeighbors = this.getHexNeighbors(fromCoord);
+        const common = fromNeighbors.filter(n => Math.abs(n.q - toCoord.q) <= 1 && Math.abs(n.r - toCoord.r) <= 1 && Math.abs((-n.q - n.r) - (-toCoord.q - toCoord.r)) <= 1);
+
+        if (common.length < 2) return true;
+
+        const s1 = board[`${common[0].q},${common[0].r}`];
+        const s2 = board[`${common[1].q},${common[1].r}`];
+
+        const n1Occ = s1 && s1.length > 0;
+        const n2Occ = s2 && s2.length > 0;
+
+        return !(n1Occ && n2Occ);
+    }
+
+    calculateValidMovesForSelectedPiece(fromCoord) {
+        this.validTargetCoords = [];
+        const board = this.state?.board || this.state?.Board;
+        const queenPlacedDict = this.state?.queenPlaced || this.state?.QueenPlaced || {};
+        const queenPlaced = queenPlacedDict[this.myPlayerId] ?? false;
+
+        if (!queenPlaced) {
+            alert('⚠️ Bạn phải đặt 👑 Ong Chúa ra bàn cờ trước khi di chuyển bất kỳ quân nào!');
+            return;
+        }
+
+        if (!this.checkOneHiveRule(fromCoord)) {
+            alert('⚠️ Quân cờ này đang liên kết tổ ong (One-Hive Rule)! Rút ra sẽ làm đứt gãy tổ ong nên không được di chuyển.');
+            return;
+        }
+
+        if (!board || !fromCoord) return;
+        const fromKey = `${fromCoord.q},${fromCoord.r}`;
+        const stack = board[fromKey];
+        if (!stack || stack.length === 0) return;
+
+        const piece = stack[stack.length - 1];
+        const pType = piece.pieceType || piece.PieceType;
+        const pieceId = piece.id || piece.Id;
+
+        const immobilePieceId = this.state?.immobilePieceId || this.state?.ImmobilePieceId;
+        if (immobilePieceId && pieceId === immobilePieceId) {
+            alert('⚠️ Quân cờ này vừa bị dịch chuyển (Pillbug Warp) ở lượt trước! Theo luật cờ Hive, quân cờ không được phép di chuyển 2 lần liên tiếp.');
+            return;
+        }
+
+        const hasAdj = (c) => {
+            return this.getHexNeighbors(c).some(n => {
+                if (n.q === fromCoord.q && n.r === fromCoord.r) return false;
+                const s = board[`${n.q},${n.r}`];
+                return s && s.length > 0;
+            });
+        };
+
+        const neighbors = this.getHexNeighbors(fromCoord);
+
+        if (pType === 'queen' || pType === 'pillbug') {
+            neighbors.forEach(n => {
+                const s = board[`${n.q},${n.r}`];
+                if ((!s || s.length === 0) && hasAdj(n) && this.canSlideGround(fromCoord, n)) {
+                    this.validTargetCoords.push(n);
+                }
+            });
+        } else if (pType === 'beetle') {
+            neighbors.forEach(n => {
+                const s = board[`${n.q},${n.r}`];
+                if ((s && s.length > 0) || (hasAdj(n) && this.canSlideGround(fromCoord, n))) {
+                    this.validTargetCoords.push(n);
+                }
+            });
+        } else if (pType === 'grasshopper') {
+            const dirs = [
+                { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+                { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+            ];
+            dirs.forEach(dir => {
+                let curr = { q: fromCoord.q + dir.q, r: fromCoord.r + dir.r };
+                let dist = 0;
+                while (board[`${curr.q},${curr.r}`]?.length > 0) {
+                    curr = { q: curr.q + dir.q, r: curr.r + dir.r };
+                    dist++;
+                }
+                if (dist > 0) {
+                    this.validTargetCoords.push(curr);
+                }
+            });
+        } else if (pType === 'ant') {
+            const visited = new Set([fromKey]);
+            const queue = [fromCoord];
+
+            while (queue.length > 0) {
+                const curr = queue.shift();
+                this.getHexNeighbors(curr).forEach(n => {
+                    const key = `${n.q},${n.r}`;
+                    if (visited.has(key)) return;
+                    const s = board[key];
+                    if (!s || s.length === 0) {
+                        if (hasAdj(n) && this.canSlideGround(curr, n)) {
+                            visited.add(key);
+                            this.validTargetCoords.push(n);
+                            queue.push(n);
+                        }
+                    }
+                });
+            }
+        } else if (pType === 'spider') {
+            const DFS = (curr, step, path) => {
+                if (step === 3) {
+                    if (!this.validTargetCoords.some(c => c.q === curr.q && c.r === curr.r)) {
+                        this.validTargetCoords.push(curr);
+                    }
+                    return;
+                }
+                this.getHexNeighbors(curr).forEach(n => {
+                    const key = `${n.q},${n.r}`;
+                    if (path.has(key)) return;
+                    const s = board[key];
+                    if (!s || s.length === 0) {
+                        if (hasAdj(n) && this.canSlideGround(curr, n)) {
+                            path.add(key);
+                            DFS(n, step + 1, path);
+                            path.delete(key);
+                        }
+                    }
+                });
+            };
+            DFS(fromCoord, 0, new Set([fromKey]));
+        } else if (pType === 'ladybug') {
+            const step1Coords = neighbors.filter(n => board[`${n.q},${n.r}`]?.length > 0);
+            step1Coords.forEach(s1 => {
+                const step2Coords = this.getHexNeighbors(s1).filter(n => !(n.q === fromCoord.q && n.r === fromCoord.r) && board[`${n.q},${n.r}`]?.length > 0);
+                step2Coords.forEach(s2 => {
+                    const step3Coords = this.getHexNeighbors(s2).filter(n => !(n.q === s1.q && n.r === s1.r) && (!board[`${n.q},${n.r}`] || board[`${n.q},${n.r}`].length === 0));
+                    step3Coords.forEach(s3 => {
+                        if (!this.validTargetCoords.some(c => c.q === s3.q && c.r === s3.r)) {
+                            this.validTargetCoords.push(s3);
+                        }
+                    });
+                });
+            });
+        } else if (pType === 'mosquito') {
+            const adjacentTypes = new Set();
+            neighbors.forEach(n => {
+                const s = board[`${n.q},${n.r}`];
+                if (s && s.length > 0) {
+                    const top = s[s.length - 1];
+                    const t = top.pieceType || top.PieceType;
+                    if (t) adjacentTypes.add(t);
+                }
+            });
+
+            if (adjacentTypes.has('ant')) {
+                const visited = new Set([fromKey]);
+                const queue = [fromCoord];
+                while (queue.length > 0) {
+                    const curr = queue.shift();
+                    this.getHexNeighbors(curr).forEach(n => {
+                        const key = `${n.q},${n.r}`;
+                        if (visited.has(key)) return;
+                        const s = board[key];
+                        if (!s || s.length === 0) {
+                            if (hasAdj(n) && this.canSlideGround(curr, n)) {
+                                visited.add(key);
+                                if (!this.validTargetCoords.some(c => c.q === n.q && c.r === n.r)) this.validTargetCoords.push(n);
+                                queue.push(n);
+                            }
+                        }
+                    });
+                }
+            }
+            if (adjacentTypes.has('beetle')) {
+                neighbors.forEach(n => {
+                    const s = board[`${n.q},${n.r}`];
+                    if ((s && s.length > 0) || (hasAdj(n) && this.canSlideGround(fromCoord, n))) {
+                        if (!this.validTargetCoords.some(c => c.q === n.q && c.r === n.r)) this.validTargetCoords.push(n);
+                    }
+                });
+            }
+            if (adjacentTypes.has('grasshopper')) {
+                const dirs = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }, { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }];
+                dirs.forEach(dir => {
+                    let curr = { q: fromCoord.q + dir.q, r: fromCoord.r + dir.r };
+                    let dist = 0;
+                    while (board[`${curr.q},${curr.r}`]?.length > 0) {
+                        curr = { q: curr.q + dir.q, r: curr.r + dir.r };
+                        dist++;
+                    }
+                    if (dist > 0 && !this.validTargetCoords.some(c => c.q === curr.q && c.r === curr.r)) {
+                        this.validTargetCoords.push(curr);
+                    }
+                });
+            }
+            if (adjacentTypes.has('queen') || adjacentTypes.has('pillbug')) {
+                neighbors.forEach(n => {
+                    const s = board[`${n.q},${n.r}`];
+                    if ((!s || s.length === 0) && hasAdj(n) && this.canSlideGround(fromCoord, n)) {
+                        if (!this.validTargetCoords.some(c => c.q === n.q && c.r === n.r)) this.validTargetCoords.push(n);
+                    }
+                });
+            }
+        } else {
+            neighbors.forEach(n => {
+                if (hasAdj(n) && this.canSlideGround(fromCoord, n)) this.validTargetCoords.push(n);
+            });
+        }
+    }
+
     bindEvents() {
         document.getElementById('btn-hexahive-rules')?.addEventListener('click', () => {
             if (window.soundFX) window.soundFX.play('play');
             if (this.rulesModal) this.rulesModal.show();
+        });
+
+        document.getElementById('btn-hexahive-surrender')?.addEventListener('click', () => {
+            if (confirm('🏳️ Bạn có chắc chắn muốn xin Đầu Hàng không?')) {
+                if (window.soundFX) window.soundFX.play('defuse');
+                if (window.signalRService) window.signalRService.sendGameAction('surrender', {});
+            }
+        });
+
+        document.getElementById('btn-hexahive-leave')?.addEventListener('click', async () => {
+            if (confirm('🚪 Bạn có chắc chắn muốn Rời Phòng trở về Trang Chủ không?')) {
+                if (window.soundFX) window.soundFX.play('click');
+                if (window.signalRService) await window.signalRService.leaveRoomExplicit();
+                this.clear();
+                if (window.lobbyManager) {
+                    window.lobbyManager.clearRoomState();
+                }
+            }
         });
 
         document.getElementById('btn-hexahive-pass')?.addEventListener('click', () => {
@@ -419,7 +684,7 @@ class HexaHiveRenderer {
                 if (window.soundFX) window.soundFX.play('draw');
                 this.selectedHandPiece = null;
                 this.selectedBoardCoord = hexCoord;
-                this.validTargetCoords = [];
+                this.calculateValidMovesForSelectedPiece(hexCoord);
                 this.updateHandUI();
                 this.draw();
             }
@@ -575,20 +840,92 @@ class HexaHiveRenderer {
     }
 
     showGameOverModal(state) {
+        if (this.isGameOverModalShown) return;
+        this.isGameOverModalShown = true;
+
         if (window.soundFX) window.soundFX.play('defuse');
         const isDraw = state.isDraw || state.IsDraw;
         const winnerName = state.winnerName || state.WinnerName || 'CHIẾN THẮNG';
-        const msg = isDraw
-            ? '🤝 TRẬN ĐẤU HÒA! Cả 2 Ong Chúa đều bị bao vây cùng lúc!'
-            : `🏆 CHÚC MỪNG ${winnerName} THẮNG TRẬN!`;
+        const winnerId = state.winnerPlayerId || state.WinnerPlayerId;
 
-        alert(msg);
+        const isMeWinner = winnerId === this.myPlayerId;
+        let icon = isDraw ? '🤝' : (isMeWinner ? '🏆' : '👑');
+        let title = isDraw ? 'TRẬN ĐẤU HÒA!' : (isMeWinner ? 'CHIẾN THẮNG RỰC RỠ!' : 'KẾT THÚC VÁN ĐẤU');
+        let subMsg = isDraw
+            ? 'Cả 2 Ong Chúa đều bị bao vây cùng lúc!'
+            : `Chúc mừng <strong>${winnerName}</strong> đã xuất sắc bao vây Ong Chúa đối thủ!`;
+
+        // Create overlay modal
+        const modalId = 'hexahive-gameover-popup';
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const modalHTML = `
+            <div id="${modalId}" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 99999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.4s ease;">
+                <div style="background: linear-gradient(135deg, rgba(23, 20, 41, 0.98), rgba(15, 10, 35, 0.98)); border: 2px solid #fbbf24; border-radius: 20px; width: 90%; max-width: 480px; padding: 32px 24px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; gap: 16px;">
+                    <div style="font-size: 64px; line-height: 1;">${icon}</div>
+                    <h2 style="font-size: 24px; color: #fbbf24; margin: 0; font-weight: 800;">${title}</h2>
+                    <p style="font-size: 15px; color: #e2e8f0; margin: 0; line-height: 1.5;">${subMsg}</p>
+                    
+                    <div style="display: flex; gap: 12px; margin-top: 16px; width: 100%;">
+                        <button id="btn-gameover-inspect" class="btn btn-ghost" style="flex: 1; padding: 12px; font-size: 14px; border-color: #8b5cf6; color: #a78bfa;">👀 Xem Bàn Cờ</button>
+                        <button id="btn-gameover-lobby" class="btn btn-primary" style="flex: 1; padding: 12px; font-size: 14px; background: linear-gradient(135deg, #8b5cf6, #6d28d9);">🏠 Về Phòng Chờ</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Bind Inspect button
+        document.getElementById('btn-gameover-inspect')?.addEventListener('click', () => {
+            const popup = document.getElementById(modalId);
+            if (popup) popup.style.display = 'none';
+
+            // Show floating reopen button
+            if (!document.getElementById('btn-reopen-gameover')) {
+                const reopenBtn = document.createElement('button');
+                reopenBtn.id = 'btn-reopen-gameover';
+                reopenBtn.className = 'btn btn-primary';
+                reopenBtn.innerHTML = '🏆 Xem Kết Quả';
+                reopenBtn.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999; padding: 10px 18px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);';
+                reopenBtn.addEventListener('click', () => {
+                    if (popup) popup.style.display = 'flex';
+                });
+                document.body.appendChild(reopenBtn);
+            }
+        });
+
+        // Bind Return to Lobby button
+        document.getElementById('btn-gameover-lobby')?.addEventListener('click', async () => {
+            const popup = document.getElementById(modalId);
+            if (popup) popup.remove();
+            const reopenBtn = document.getElementById('btn-reopen-gameover');
+            if (reopenBtn) reopenBtn.remove();
+
+            this.clear();
+            if (window.lobbyManager && window.lobbyManager.currentRoom) {
+                document.getElementById('room-view').style.display = 'block';
+                window.lobbyManager.renderRoomState(window.lobbyManager.currentRoom);
+            } else if (window.lobbyManager) {
+                window.lobbyManager.clearRoomState();
+            }
+        });
     }
 
     clear() {
+        this.isGameOverModalShown = false;
+        const reopenBtn = document.getElementById('btn-reopen-gameover');
+        if (reopenBtn) reopenBtn.remove();
+        const popup = document.getElementById('hexahive-gameover-popup');
+        if (popup) popup.remove();
+
         window.removeEventListener('resize', this.boundResize);
         const appContainer = document.getElementById('game-container');
-        if (appContainer) appContainer.innerHTML = '';
+        if (appContainer) {
+            appContainer.innerHTML = '';
+            appContainer.style.display = 'none';
+        }
     }
 }
 
