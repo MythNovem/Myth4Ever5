@@ -10,5 +10,6 @@ public class PlayerModel
     public bool IsReady { get; set; } = true;
     public bool IsAlive { get; set; } = true;
     public bool IsConnected { get; set; } = true;
+    public bool IsBot { get; set; } = false;
     public int Score { get; set; } = 0;
 }

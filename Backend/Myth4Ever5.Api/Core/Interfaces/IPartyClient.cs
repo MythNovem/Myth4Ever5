@@ -12,5 +12,6 @@ public interface IPartyClient
     Task GameOver(string winnerId, string winnerName, object summary);
     Task ReceiveChatMessage(string senderId, string senderName, string senderAvatar, string message, string timestamp);
     Task ReceiveEmojiReaction(string senderId, string senderName, string emoji);
+    Task PlayerKicked(string reason);
     Task ErrorNotification(string errorMessage);
 }

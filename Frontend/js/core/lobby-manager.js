@@ -3,6 +3,16 @@ class LobbyManager {
         this.selectedAvatar = '🧙‍♂️';
         this.currentRoom = null;
         this.initDOM();
+        this.initSignalREvents();
+    }
+
+    initSignalREvents() {
+        if (window.signalRService) {
+            window.signalRService.on('PlayerKicked', (reason) => {
+                alert(`🚫 ${reason}`);
+                this.clearRoomState();
+            });
+        }
     }
 
     initDOM() {
@@ -40,6 +50,11 @@ class LobbyManager {
             await window.signalRService.joinRoom(codeInput, nameInput, this.selectedAvatar);
         });
 
+        // Add Bot Button (Host)
+        document.getElementById('btn-add-bot')?.addEventListener('click', async () => {
+            await window.signalRService.addBot();
+        });
+
         // Start Game Button
         document.getElementById('btn-start-game')?.addEventListener('click', async () => {
             await window.signalRService.startGame();
@@ -61,11 +76,21 @@ class LobbyManager {
             if (e.key === 'Enter') this.sendChat();
         });
 
-        // Emoji Reactions
+        // Toggle Chat Panel
+        document.getElementById('btn-toggle-chat')?.addEventListener('click', () => {
+            const chatPanel = document.getElementById('chat-panel');
+            if (chatPanel) {
+                chatPanel.classList.toggle('collapsed');
+                const unreadDot = document.getElementById('unread-chat-dot');
+                if (unreadDot) unreadDot.style.display = 'none';
+            }
+        });
+
+        // Emoji Reaction Buttons
         document.querySelectorAll('.emoji-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const emoji = btn.getAttribute('data-emoji');
-                if (emoji) window.signalRService.sendEmojiReaction(emoji);
+            btn.addEventListener('click', async (e) => {
+                const emoji = e.target.innerText;
+                await window.signalRService.sendEmojiReaction(emoji);
             });
         });
 
@@ -127,10 +152,19 @@ class LobbyManager {
         if (room.isGameStarted) {
             document.getElementById('room-view').style.display = 'none';
         } else {
-            document.getElementById('room-view').style.display = 'block';
-            if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
-            const bannerContainer = document.getElementById('action-banner-container');
-            if (bannerContainer) bannerContainer.innerHTML = '';
+            const hasGameOverActive = document.getElementById('hexahive-gameover-popup') || document.getElementById('btn-reopen-gameover');
+            if (!hasGameOverActive) {
+                document.getElementById('room-view').style.display = 'block';
+                if (window.mcTimerRenderer) window.mcTimerRenderer.clear();
+                if (window.hexahiveRenderer) window.hexahiveRenderer.clear();
+                const gameContainer = document.getElementById('game-container');
+                if (gameContainer) {
+                    gameContainer.innerHTML = '';
+                    gameContainer.style.display = 'none';
+                }
+                const bannerContainer = document.getElementById('action-banner-container');
+                if (bannerContainer) bannerContainer.innerHTML = '';
+            }
         }
 
         const myPlayerId = window.signalRService.getPlayerId();
@@ -143,11 +177,25 @@ class LobbyManager {
             gameSelect.disabled = !isHost;
         }
 
+        const gameMaxPlayers = {
+            'mythic_cards': 4,
+            'number_bomb': 8,
+            'hexahive': 2
+        };
+        const selectedGame = room.selectedGameTypeId || 'mythic_cards';
+        const maxPlayers = gameMaxPlayers[selectedGame] || 4;
+
         const startBtn = document.getElementById('btn-start-game');
         const readyBtn = document.getElementById('btn-toggle-ready');
+        const addBotBtn = document.getElementById('btn-add-bot');
 
         const nonHostPlayers = room.players.filter(p => !p.isHost);
         const allReady = nonHostPlayers.length > 0 && nonHostPlayers.every(p => p.isReady);
+
+        const isHexaHive = selectedGame === 'hexahive';
+        if (addBotBtn) {
+            addBotBtn.style.display = (isHost && isHexaHive && room.players.length < maxPlayers && !room.isGameStarted) ? 'block' : 'none';
+        }
 
         if (isHost) {
             if (readyBtn) readyBtn.style.display = 'none';
@@ -156,12 +204,12 @@ class LobbyManager {
                 startBtn.disabled = room.players.length < 2 || !allReady;
 
                 if (room.players.length < 2) {
-                    startBtn.innerText = `Đang chờ thêm người (${room.players.length}/4)...`;
+                    startBtn.innerText = `Đang chờ thêm người (${room.players.length}/${maxPlayers})...`;
                 } else if (!allReady) {
                     const unreadyCount = nonHostPlayers.filter(p => !p.isReady).length;
                     startBtn.innerText = `⏳ Chờ người chơi Sẵn Sàng (${unreadyCount} người chưa sẵn sàng)...`;
                 } else {
-                    startBtn.innerText = `🎮 Bắt Đầu Game (${room.players.length} người)`;
+                    startBtn.innerText = `🎮 Bắt Đầu Game (${room.players.length}/${maxPlayers} người)`;
                 }
             }
         } else {
@@ -191,18 +239,35 @@ class LobbyManager {
                     badge = '<span style="color:var(--text-muted); font-size:11px;">⏳ Chưa sẵn sàng</span>';
                 }
 
+                let kickBtnHtml = '';
+                if (isHost && !p.isHost) {
+                    kickBtnHtml = `<button class="btn-kick-player" data-player-id="${p.playerId}" title="Đuổi người chơi" style="background: none; border: 1px solid var(--crimson); color: var(--crimson-bright); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: 8px;">❌ Đuổi</button>`;
+                }
+
                 return `
                 <div class="player-row" style="${offlineStyle}">
                     <div class="player-avatar">${p.avatarUrl}</div>
-                    <div class="player-info">
-                        <div class="player-name-text">${p.playerName}${offlineText}</div>
-                        <div class="player-badge">
-                            ${badge}
-                            ${isMe ? '<span style="font-size:11px; color:var(--text-muted);"> · Bạn</span>' : ''}
+                    <div class="player-info" style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div class="player-name-text">${p.playerName}${offlineText}</div>
+                            <div class="player-badge">
+                                ${badge}
+                                ${isMe ? '<span style="font-size:11px; color:var(--text-muted);"> · Bạn</span>' : ''}
+                            </div>
                         </div>
+                        ${kickBtnHtml}
                     </div>
                 </div>`;
             }).join('');
+
+            playerListContainer.querySelectorAll('.btn-kick-player').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const targetId = e.currentTarget.dataset.playerId;
+                    if (confirm('🚫 Bạn có chắc chắn muốn đuổi người chơi này ra khỏi phòng không?')) {
+                        await window.signalRService.kickPlayer(targetId);
+                    }
+                });
+            });
         }
     }
 
