@@ -99,16 +99,25 @@ public class LiarsDeckEngine : IGameEngine
         if (room.GameState is not LiarsDeckState state)
             return Task.FromResult(new GameActionResult { Success = false, Message = "Trạng thái game không hợp lệ!" });
 
+        if (actionType == "trigger_gun")
+        {
+            return Task.FromResult(HandleTriggerGun(room, state, playerId));
+        }
+
         var currentPlayer = room.Players[state.CurrentTurnIndex];
         if (currentPlayer.PlayerId != playerId)
             return Task.FromResult(new GameActionResult { Success = false, Message = "Chưa đến lượt của bạn!" });
 
         if (actionType == "play_cards")
         {
+            if (state.PendingShootPlayerId != null)
+                return Task.FromResult(new GameActionResult { Success = false, Message = $"Đang chờ người chơi bóp cò súng!" });
             return Task.FromResult(HandlePlayCards(room, state, currentPlayer, payload));
         }
         else if (actionType == "challenge")
         {
+            if (state.PendingShootPlayerId != null)
+                return Task.FromResult(new GameActionResult { Success = false, Message = $"Đang chờ người chơi bóp cò súng!" });
             return Task.FromResult(HandleChallenge(room, state, currentPlayer));
         }
 
@@ -168,6 +177,8 @@ public class LiarsDeckEngine : IGameEngine
             CanChallenge = true
         };
 
+        state.LastChallengeResult = null;
+
         state.GameLogs.Add($"🃏 {player.PlayerName} đã đánh úp {selectedCards.Count} lá bài và tuyên bố là {GetRankDisplayName(state.TableRank)}!");
 
         // Advance turn to next alive player
@@ -199,7 +210,6 @@ public class LiarsDeckEngine : IGameEngine
         bool wasLying = cardsPlayed.Any(c => c.Rank != state.TableRank && c.Rank != CardRank.Joker);
 
         var shooter = wasLying ? claimant : challenger;
-        var nonShooter = wasLying ? challenger : claimant;
 
         state.GameLogs.Add($"🚨 {challenger.PlayerName} đã lật bài TỐ {claimant.PlayerName}!");
 
@@ -208,14 +218,39 @@ public class LiarsDeckEngine : IGameEngine
 
         if (wasLying)
         {
-            state.GameLogs.Add($"❌ {claimant.PlayerName} ĐÃ NÓI DỐI! {claimant.PlayerName} phải tự bóp cò súng!");
+            state.GameLogs.Add($"❌ {claimant.PlayerName} ĐÃ NÓI DỐI! {claimant.PlayerName} phải CLICK VÀO KHẨU SÚNG ĐỂ BÓP CÒ!");
         }
         else
         {
-            state.GameLogs.Add($"✅ {claimant.PlayerName} NÓI THẬT (hoặc dùng Joker)! {challenger.PlayerName} tố sai và phải tự bóp cò súng!");
+            state.GameLogs.Add($"✅ {claimant.PlayerName} NÓI THẬT (hoặc dùng Joker)! {challenger.PlayerName} tố sai và phải CLICK VÀO KHẨU SÚNG ĐỂ BÓP CÒ!");
         }
 
-        // 2. Perform Russian Roulette on shooter
+        // Set pending shooter
+        state.PendingShootPlayerId = shooter.PlayerId;
+        state.LastClaim.CanChallenge = false;
+
+        return new GameActionResult
+        {
+            Success = true,
+            ActionType = "challenge_revealed",
+            Data = SanitizeStateForBroadcast(room, state)
+        };
+    }
+
+    private GameActionResult HandleTriggerGun(RoomModel room, LiarsDeckState state, string playerId)
+    {
+        if (state.PendingShootPlayerId != playerId)
+        {
+            return new GameActionResult { Success = false, Message = "Chưa đến lượt bạn bóp cò súng!" };
+        }
+
+        var shooter = room.Players.FirstOrDefault(p => p.PlayerId == playerId);
+        if (shooter == null)
+        {
+            return new GameActionResult { Success = false, Message = "Người chơi không tồn tại!" };
+        }
+
+        // Perform Russian Roulette
         var revolver = state.Revolvers[shooter.PlayerId];
         bool didFire = (revolver.CurrentChamber == revolver.BulletChamber);
         revolver.TotalShotsFired++;
@@ -223,31 +258,33 @@ public class LiarsDeckEngine : IGameEngine
         if (didFire)
         {
             shooter.IsAlive = false;
-            state.GameLogs.Add($"💥 BANG!!! Súng của {shooter.PlayerName} NỔ TUNG! {shooter.PlayerName} bị loại khỏi trò chơi!");
+            state.GameLogs.Add($"💥 BANG!!! Súng của {shooter.PlayerName} NỔ TUNG! {shooter.PlayerName} bị xử thua và loại khỏi cuộc chơi!");
         }
         else
         {
             revolver.CurrentChamber = (revolver.CurrentChamber + 1) % 6;
-            state.GameLogs.Add($"💨 CLICK! Súng của {shooter.PlayerName} KHÔNG NỔ! {shooter.PlayerName} may mắn sống sót và lên đạn khoang tiếp theo ({revolver.CurrentChamber + 1}/6).");
+            state.GameLogs.Add($"💨 CLICK! Súng của {shooter.PlayerName} KHÔNG NỔ (Blank)! {shooter.PlayerName} sống sót và chuyển sang khoang đạn tiếp theo ({revolver.CurrentChamber + 1}/6).");
         }
 
+        var cardsPlayed = state.LastClaim?.CardsPlayed ?? new List<LiarsDeckCard>();
+        var turnPlayer = room.Players[state.CurrentTurnIndex];
         state.LastChallengeResult = new ChallengeResultInfo
         {
-            ChallengerId = challenger.PlayerId,
-            ChallengerName = challenger.PlayerName,
-            ClaimantId = claimant.PlayerId,
-            ClaimantName = claimant.PlayerName,
+            ChallengerId = turnPlayer.PlayerId,
+            ChallengerName = turnPlayer.PlayerName,
+            ClaimantId = state.LastClaim?.PlayerId ?? "",
+            ClaimantName = state.LastClaim?.PlayerName ?? "",
             RevealedCards = cardsPlayed,
-            WasLying = wasLying,
+            WasLying = cardsPlayed.Any(c => c.Rank != state.TableRank && c.Rank != CardRank.Joker),
             ShooterId = shooter.PlayerId,
             ShooterName = shooter.PlayerName,
             DidGunFire = didFire,
             DidShooterDie = !shooter.IsAlive
         };
 
-        state.LastClaim.CanChallenge = false;
+        state.PendingShootPlayerId = null;
 
-        // 3. Check for Winner
+        // Check for Winner
         var survivors = room.Players.Where(p => p.IsAlive).ToList();
         if (survivors.Count <= 1)
         {
@@ -260,7 +297,7 @@ public class LiarsDeckEngine : IGameEngine
             return new GameActionResult
             {
                 Success = true,
-                ActionType = "challenge_resolved",
+                ActionType = "gun_fired",
                 IsGameOver = true,
                 WinnerId = winner?.PlayerId,
                 WinnerName = winner?.PlayerName,
@@ -268,15 +305,14 @@ public class LiarsDeckEngine : IGameEngine
             };
         }
 
-        // 4. If > 1 survivors, start a new round
-        // Advance turn to next alive player
+        // Advance turn and start new round
         AdvanceTurn(room, state);
         StartNewRound(room, state, isFirstRound: false);
 
         return new GameActionResult
         {
             Success = true,
-            ActionType = "challenge_resolved",
+            ActionType = "gun_fired",
             Data = SanitizeStateForBroadcast(room, state)
         };
     }
@@ -358,6 +394,7 @@ public class LiarsDeckEngine : IGameEngine
                 state.LastChallengeResult.DidShooterDie
             } : null,
             Hands = formattedHands,
+            PendingShootPlayerId = state.PendingShootPlayerId,
             GameLogs = state.GameLogs.TakeLast(12).ToList(),
             WinnerPlayerId = state.WinnerPlayerId,
             WinnerPlayerName = state.WinnerPlayerName

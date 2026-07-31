@@ -41,6 +41,7 @@ public class LiarsDeckState
     public ChallengeResultInfo? LastChallengeResult { get; set; }
     public List<LiarsDeckCard> TablePile { get; set; } = new();
     public List<string> GameLogs { get; set; } = new();
+    public string? PendingShootPlayerId { get; set; }
     public string? WinnerPlayerId { get; set; }
     public string? WinnerPlayerName { get; set; }
 }

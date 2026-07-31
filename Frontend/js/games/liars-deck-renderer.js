@@ -1,6 +1,7 @@
 /**
  * liars-deck-renderer.js
  * Vintage Liar's Bar Style Renderer for Game #4: Liar's Deck.
+ * Supports standalone metallic revolver pistol facing vertically upwards, shot counter badge "Đã bắn 0/6", and manual click-to-shoot.
  */
 class LiarsDeckRenderer {
     constructor() {
@@ -103,12 +104,18 @@ class LiarsDeckRenderer {
         window.signalRService.sendGameAction('challenge', {});
     }
 
+    triggerGunShoot() {
+        window.signalRService.sendGameAction('trigger_gun', {});
+    }
+
     handleAction(actionType, data) {
         if (data) this.updateState(data);
 
         if (actionType === 'cards_played') {
             if (window.soundFX) window.soundFX.play('card');
-        } else if (actionType === 'challenge_resolved' && data && data.lastChallengeResult) {
+        } else if (actionType === 'challenge_revealed') {
+            if (window.soundFX) window.soundFX.play('click');
+        } else if (actionType === 'gun_fired' && data && data.lastChallengeResult) {
             const res = data.lastChallengeResult;
             if (res.didGunFire) {
                 if (window.soundFX) window.soundFX.play('explosion');
@@ -123,6 +130,7 @@ class LiarsDeckRenderer {
         this.gameState = state;
         const myId = window.signalRService.getPlayerId();
         const isMyTurn = state.currentTurnPlayerId === myId;
+        const mustShootId = state.pendingShootPlayerId;
 
         // 1. Update Table Rank Title
         const rankTitleEl = document.getElementById('ld-table-rank-title');
@@ -139,14 +147,21 @@ class LiarsDeckRenderer {
         // 3. Update Turn Status inside Table Felt
         const statusEl = document.getElementById('ld-turn-status');
         if (statusEl) {
-            if (isMyTurn) {
+            if (mustShootId) {
+                if (mustShootId === myId) {
+                    statusEl.innerHTML = `<span style="color:var(--crimson-bright); font-weight:bold; font-size:14px; animation:pulse 1s infinite;">💥 BẠN THUA TỐ! Click khẩu súng bên phải tên mình để bóp cò!</span>`;
+                } else {
+                    const shooterObj = state.players.find(p => p.playerId === mustShootId);
+                    statusEl.innerHTML = `<span style="color:var(--gold-bright); font-weight:bold;">⏳ Đang chờ <strong>${shooterObj ? shooterObj.playerName : 'đối thủ'}</strong> bóp cò súng...</span>`;
+                }
+            } else if (isMyTurn) {
                 statusEl.innerHTML = `<span style="color:var(--emerald-bright); font-weight:bold;">👉 ĐẾN LƯỢT BẠN! Chọn 1-3 lá bài để Đánh hoặc bấm Tố.</span>`;
             } else {
                 statusEl.innerHTML = `Đang chờ <strong>${state.currentTurnPlayerName}</strong> hành động...`;
             }
         }
 
-        // 4. Render Radial Seats around Circular Table
+        // 4. Render Radial Seats around Circular Table with Vertical Standalone Revolver
         const seatsWrapper = document.getElementById('ld-seats-wrapper');
         if (seatsWrapper && state.players) {
             const players = state.players;
@@ -159,30 +174,48 @@ class LiarsDeckRenderer {
                 const posClass = this.getSeatPosClass(relIndex, totalPlayers);
                 const isCurrent = p.playerId === state.currentTurnPlayerId;
                 const isMe = p.playerId === myId;
-
-                // Build 6 revolver chamber dots
-                let dotsHtml = '';
-                for (let c = 1; c <= 6; c++) {
-                    const isCurrentChamber = c === p.currentChamber;
-                    dotsHtml += `<div class="ld-chamber-dot ${isCurrentChamber ? 'current' : ''}"></div>`;
-                }
+                const isPendingShooter = p.playerId === mustShootId;
 
                 return `
                     <div class="ld-seat ${posClass} ${isCurrent ? 'active-turn' : ''} ${!p.isAlive ? 'dead' : ''}">
+                        <!-- Seat Player Box (Left) -->
                         <div class="ld-seat-box">
                             <div class="ld-seat-avatar">${p.isAlive ? (p.avatarUrl || '👤') : '💀'}</div>
                             <div class="ld-seat-info">
                                 <div class="ld-seat-name">${p.playerName} ${isMe ? '(Bạn)' : ''}</div>
                                 <div class="ld-seat-cards-count">🎴 ${p.cardsCount} lá bài</div>
-                                <div class="ld-revolver-cylinder" title="Khoang đạn hiện tại: ${p.currentChamber}/6">
-                                    <span style="font-size:10px;">🔫</span>
-                                    ${dotsHtml}
-                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Standalone Vertical Revolver Pistol (Right) -->
+                        <div class="ld-standalone-revolver ${isPendingShooter && isMe ? 'must-shoot' : ''}" 
+                             id="gun-btn-${p.playerId}" 
+                             title="${isPendingShooter && isMe ? 'Click để tự bóp cò súng!' : `Khẩu Súng Lục Ổ Xoay — Đã bắn ${p.totalShotsFired}/6 phát`}">
+                            
+                            ${this.getRevolverSvgHtml()}
+
+                            <div class="ld-revolver-counter-badge">
+                                <span class="ld-shot-text">Đã bắn</span>
+                                <span class="ld-shot-num">${p.totalShotsFired}/6</span>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            // Click listener for side gun when must shoot
+            if (mustShootId && mustShootId === myId) {
+                const gunBtn = document.getElementById(`gun-btn-${myId}`);
+                gunBtn?.addEventListener('click', () => {
+                    if (this.isShooting) return;
+                    this.isShooting = true;
+                    gunBtn.classList.add('shooting-anim');
+                    setTimeout(() => {
+                        this.triggerGunShoot();
+                        this.isShooting = false;
+                    }, 350);
+                });
+            }
         }
 
         // 5. Render Hand Cards in Fan Layout
@@ -223,6 +256,10 @@ class LiarsDeckRenderer {
             // Card Click Listeners
             cardsRowEl.querySelectorAll('.ld-card').forEach(cardEl => {
                 cardEl.addEventListener('click', () => {
+                    if (mustShootId) {
+                        window.lobbyManager.showToast('Bạn phải BÓP CÒ SÚNG trước khi đánh bài!', 'warning');
+                        return;
+                    }
                     const cid = cardEl.getAttribute('data-id');
                     if (this.selectedCardIds.has(cid)) {
                         this.selectedCardIds.delete(cid);
@@ -245,12 +282,12 @@ class LiarsDeckRenderer {
         if (btnPlay) {
             const count = this.selectedCardIds.size;
             btnPlay.textContent = `🃏 Đánh Bài (${count} lá)`;
-            btnPlay.disabled = !isMyTurn || count === 0 || count > 3;
+            btnPlay.disabled = !isMyTurn || count === 0 || count > 3 || Boolean(mustShootId);
         }
 
         if (btnChallenge) {
             const canChallenge = state.lastClaim && state.lastClaim.canChallenge && state.lastClaim.playerId !== myId;
-            btnChallenge.disabled = !isMyTurn || !canChallenge;
+            btnChallenge.disabled = !isMyTurn || !canChallenge || Boolean(mustShootId);
         }
 
         // 7. Update Game Logs
@@ -259,6 +296,46 @@ class LiarsDeckRenderer {
             logsDrawer.innerHTML = state.gameLogs.map(log => `<div style="margin-bottom: 2px;">${log}</div>`).join('');
             logsDrawer.scrollTop = logsDrawer.scrollHeight;
         }
+    }
+
+    getRevolverSvgHtml() {
+        return `
+            <svg class="ld-revolver-svg" viewBox="0 0 100 60">
+                <!-- Gun Barrel -->
+                <rect x="5" y="14" width="45" height="10" rx="2" fill="url(#metalGrad)" stroke="#111" stroke-width="1"/>
+                <path d="M 8 14 L 12 9 L 14 14 Z" fill="#333"/>
+                <!-- Revolver Cylinder -->
+                <rect x="50" y="11" width="22" height="16" rx="3" fill="url(#cylinderGrad)" stroke="#111" stroke-width="1"/>
+                <line x1="50" y1="19" x2="72" y2="19" stroke="#111" stroke-width="1.5"/>
+                <!-- Gun Frame -->
+                <path d="M 45 24 L 72 24 L 72 32 L 60 38 L 45 28 Z" fill="url(#metalGrad)"/>
+                <!-- Trigger Guard & Trigger -->
+                <path d="M 52 24 Q 46 36 60 35 L 60 28" fill="none" stroke="#555" stroke-width="2"/>
+                <path d="M 56 25 Q 53 30 58 31" fill="none" stroke="#aaa" stroke-width="1.5"/>
+                <!-- Hammer -->
+                <path d="M 72 13 L 78 10 L 75 16 Z" fill="#555"/>
+                <!-- Wood Handle Grip -->
+                <path d="M 68 28 L 88 52 Q 80 58 65 52 L 58 35 Z" fill="url(#woodGrad)" stroke="#2b180d" stroke-width="1.5"/>
+                <circle cx="76" cy="42" r="2" fill="#d4af37"/>
+                <defs>
+                    <linearGradient id="metalGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#777777"/>
+                        <stop offset="50%" stop-color="#333333"/>
+                        <stop offset="100%" stop-color="#1a1a1a"/>
+                    </linearGradient>
+                    <linearGradient id="cylinderGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#444444"/>
+                        <stop offset="50%" stop-color="#888888"/>
+                        <stop offset="100%" stop-color="#222222"/>
+                    </linearGradient>
+                    <linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#964b00"/>
+                        <stop offset="50%" stop-color="#5c2e0b"/>
+                        <stop offset="100%" stop-color="#2d1705"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+        `;
     }
 
     renderVintageCardHtml(cardId, rankName, isSelected, rotateDeg) {
@@ -341,13 +418,13 @@ class LiarsDeckRenderer {
             <div class="ld-roulette-modal">
                 <div class="ld-roulette-box">
                     <div style="font-size: 36px;">🚨</div>
-                    <div style="font-size: 20px; font-weight: 800; color: var(--gold-bright);">KẾT QUẢ TỐ DỐI TRÁO</div>
+                    <div style="font-size: 20px; font-weight: 800; color: var(--gold-bright);">KẾT QUẢ CÒ QUAY NGA</div>
                     
                     <div style="font-size: 14px; color: #fff;">
-                        <strong>${result.challengerName}</strong> đã lật bài tố <strong>${result.claimantName}</strong>!
+                        <strong>${result.shooterName}</strong> đã tự bóp cò khẩu súng rulo!
                     </div>
 
-                    <div style="font-size: 12px; color: var(--gold-bright); margin-top: 4px;">CÁC LÁ BÀI VỪA LẬT:</div>
+                    <div style="font-size: 12px; color: var(--gold-bright); margin-top: 4px;">CÁC LÁ BÀI BỊ TỐ:</div>
                     <div style="display: flex; gap: 8px; justify-content: center; margin: 8px 0; min-height: 175px;">${revealedCardsHtml}</div>
 
                     <div style="font-size: 15px; font-weight: bold; color: ${result.wasLying ? 'var(--crimson-bright)' : 'var(--emerald-bright)'};">
@@ -355,11 +432,11 @@ class LiarsDeckRenderer {
                     </div>
 
                     <div class="ld-gun-result-banner ${result.didGunFire ? 'bang' : 'blank'}">
-                        ${result.didGunFire ? `💥 BANG! Súng của ${result.shooterName} NỔ TUNG!` : `💨 CLICK! Súng của ${result.shooterName} KHÔNG NỔ!`}
+                        ${result.didGunFire ? `💥 BANG! Súng của ${result.shooterName} NỔ TUNG!` : `💨 CLICK! Súng của ${result.shooterName} KHÔNG NỔ (Blank)!`}
                     </div>
 
                     <div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px;">
-                        ${result.didGunFire ? `${result.shooterName} bị loại khỏi ván chơi.` : `${result.shooterName} sống sót và chuyển sang khoang đạn tiếp theo.`}
+                        ${result.didGunFire ? `${result.shooterName} bị xử thua và loại khỏi ván chơi.` : `${result.shooterName} sống sót và chuyển sang khoang đạn tiếp theo.`}
                     </div>
 
                     <button class="btn btn-primary" id="btn-close-ld-modal" style="width: 100%; margin-top: 12px; font-size: 15px; padding: 12px;">
