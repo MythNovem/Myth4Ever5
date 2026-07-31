@@ -122,7 +122,8 @@ public static class RacePhysicsEngine
             bool offRoad = IsOffRoad(car.X, car.Y, track);
             if (offRoad && car.NitroTimer <= 0)
             {
-                maxSpeed *= 0.45f; // 55% grass penalty
+                maxSpeed *= 0.20f; // Stricter 80% speed penalty on grass!
+                car.Speed *= 0.88f; // Immediate friction deceleration on off-road
             }
 
             // Acceleration & Friction
@@ -167,6 +168,10 @@ public static class RacePhysicsEngine
             for (int i = state.DroppedItems.Count - 1; i >= 0; i--)
             {
                 var item = state.DroppedItems[i];
+
+                // Bomb is a trap for opponents; owner is immune to own bomb
+                if (item.ItemType == "bomb" && item.OwnerId == car.PlayerId) continue;
+
                 if (Distance(car.X, car.Y, item.X, item.Y) < item.Radius + 15f)
                 {
                     if (car.IsShielded)
@@ -231,7 +236,9 @@ public static class RacePhysicsEngine
                 state.RaceLogs.Add($"🍌 {car.PlayerName} thả Vỏ Chuối sau lưng!");
                 break;
             case "bomb":
-                state.DroppedItems.Add(new DroppedItemModel { ItemType = "bomb", OwnerId = playerId, X = car.X, Y = car.Y, Radius = 35f });
+                float bDropX = car.X - MathF.Cos(car.Angle) * 50f;
+                float bDropY = car.Y - MathF.Sin(car.Angle) * 50f;
+                state.DroppedItems.Add(new DroppedItemModel { ItemType = "bomb", OwnerId = playerId, X = bDropX, Y = bDropY, Radius = 35f });
                 state.RaceLogs.Add($"💣 {car.PlayerName} đặt Quả Bom Bán Kính!");
                 break;
             case "rocket":
@@ -262,29 +269,40 @@ public static class RacePhysicsEngine
         var checkpoints = state.Track.Checkpoints;
         if (checkpoints.Count == 0) return;
 
-        int nextCheckpointIdx = (car.LastPassedCheckpoint + 1) % checkpoints.Count;
-        var nextCheckpoint = checkpoints[nextCheckpointIdx];
+        // Next checkpoint required in order
+        int requiredNextIdx = (car.LastPassedCheckpoint + 1) % checkpoints.Count;
 
-        if (Distance(car.X, car.Y, nextCheckpoint.Center.X, nextCheckpoint.Center.Y) <= nextCheckpoint.Radius)
+        // Special case for initial start line: car starts before checkpoint 0
+        if (car.LastPassedCheckpoint == -1)
         {
-            car.LastPassedCheckpoint = nextCheckpointIdx;
+            requiredNextIdx = 1; // First target is checkpoint 1
+            car.LastPassedCheckpoint = 0; // Mark start line as passed
+        }
 
-            // Check if finished full lap (checkpoint 0 passed after all others)
-            if (nextCheckpointIdx == 0)
+        var nextCheckpoint = checkpoints[requiredNextIdx];
+        float distToNext = Distance(car.X, car.Y, nextCheckpoint.Center.X, nextCheckpoint.Center.Y);
+
+        if (distToNext <= nextCheckpoint.Radius)
+        {
+            // Successfully passed next required checkpoint in order
+            car.LastPassedCheckpoint = requiredNextIdx;
+
+            // When returning to Checkpoint 0 after completing all other checkpoints -> Lap completed!
+            if (requiredNextIdx == 0)
             {
-                if (car.LastPassedCheckpoint == 0 && car.CurrentLap > 0)
-                {
-                    car.CurrentLap++;
-                    state.RaceLogs.Add($"🏁 {car.PlayerName} đã hoàn thành Vòng {car.CurrentLap - 1}/{state.TotalLaps}!");
+                car.CurrentLap++;
+                state.RaceLogs.Add($"🏁 {car.PlayerName} đã hoàn thành Vòng {car.CurrentLap - 1}/{state.TotalLaps}!");
 
-                    if (car.CurrentLap > state.TotalLaps)
+                if (car.CurrentLap > state.TotalLaps)
+                {
+                    car.IsFinished = true;
+                    if (!state.RaceRankings.Contains(car.PlayerId))
                     {
-                        car.IsFinished = true;
                         state.RaceRankings.Add(car.PlayerId);
-                        car.FinishedRank = state.RaceRankings.Count;
-                        car.FinishedTime = DateTime.UtcNow;
-                        state.RaceLogs.Add($"🏆 {car.PlayerName} đã CÁN ĐÍCH ở vị trí thứ #{car.FinishedRank}!");
                     }
+                    car.FinishedRank = state.RaceRankings.Count;
+                    car.FinishedTime = DateTime.UtcNow;
+                    state.RaceLogs.Add($"🏆 {car.PlayerName} đã CÁN ĐÍCH ở vị trí thứ #{car.FinishedRank}!");
                 }
             }
         }

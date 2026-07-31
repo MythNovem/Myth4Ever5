@@ -316,8 +316,8 @@ class MythicRacerRenderer {
         const canvasW = this.canvas.width;
         const canvasH = this.canvas.height;
 
-        // Clear Background (Grass green)
-        this.ctx.fillStyle = '#143011';
+        // Clear Background (Night Grand Prix Dark Theme)
+        this.ctx.fillStyle = '#0a0e1a';
         this.ctx.fillRect(0, 0, canvasW, canvasH);
 
         const track = this.state?.track || this.state?.Track;
@@ -336,55 +336,68 @@ class MythicRacerRenderer {
         this.ctx.scale(scale, scale);
 
         const waypoints = track.waypoints || track.Waypoints || [];
-        const trackWidth = track.trackWidth || track.TrackWidth || 110;
+        const trackWidth = track.trackWidth || track.TrackWidth || 95;
 
-        // 1. Draw F1 Asphalt Track Road
+        // 1. Draw F1 Night Track Road
         this.ctx.save();
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // Outer Curb Border (Red & White striped edge)
+        // Outer Neon Red Rumble Curb Border
         this.ctx.beginPath();
         waypoints.forEach((pt, idx) => {
             if (idx === 0) this.ctx.moveTo(pt.x || pt.X, pt.y || pt.Y);
             else this.ctx.lineTo(pt.x || pt.X, pt.y || pt.Y);
         });
         this.ctx.closePath();
-        this.ctx.strokeStyle = '#ef4444';
-        this.ctx.lineWidth = trackWidth + 16;
+        this.ctx.strokeStyle = '#dc2626';
+        this.ctx.lineWidth = trackWidth + 14;
         this.ctx.stroke();
 
-        // Asphalt Road Base
-        this.ctx.strokeStyle = '#1e293b';
+        // Asphalt Road Base (Dark Slate Gray)
+        this.ctx.strokeStyle = '#151c28';
         this.ctx.lineWidth = trackWidth;
         this.ctx.stroke();
 
+        // Glowing Yellow Edge Side Lines
+        this.ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+        this.ctx.lineWidth = trackWidth - 4;
+        this.ctx.stroke();
+
+        // Inner Asphalt Core
+        this.ctx.strokeStyle = '#151c28';
+        this.ctx.lineWidth = trackWidth - 10;
+        this.ctx.stroke();
+
         // White Center Dashline
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
         this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([15, 15]);
+        this.ctx.setLineDash([16, 16]);
         this.ctx.stroke();
         this.ctx.restore();
 
-        // 2. Draw Finish Checkered Line at Waypoint #0
+        // 2. Draw Finish Checkered Line at Waypoint #0 (Spanning full track width)
         if (waypoints.length > 0) {
             const startPt = waypoints[0];
             const pX = startPt.x || startPt.X;
             const pY = startPt.y || startPt.Y;
 
             this.ctx.save();
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.fillRect(pX - 5, pY - trackWidth / 2, 10, trackWidth);
-            this.ctx.fillStyle = '#000000';
-            for (let y = pY - trackWidth / 2; y < pY + trackWidth / 2; y += 15) {
-                this.ctx.fillRect(pX - 5, y, 5, 7);
+            const sqSize = 12;
+            const rows = Math.floor(trackWidth / sqSize);
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < 2; c++) {
+                    const isWhite = (r + c) % 2 === 0;
+                    this.ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
+                    this.ctx.fillRect(pX - 12 + c * sqSize, pY - trackWidth / 2 + r * sqSize, sqSize, sqSize);
+                }
             }
             this.ctx.restore();
         }
 
         // 3. Draw Tire Skid Marks
         this.skidMarks.forEach(sm => {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             this.ctx.beginPath();
             this.ctx.arc(sm.x, sm.y, 4, 0, Math.PI * 2);
             this.ctx.fill();
@@ -401,13 +414,13 @@ class MythicRacerRenderer {
 
             this.ctx.save();
             this.ctx.shadowColor = '#fbbf24';
-            this.ctx.shadowBlur = 12;
+            this.ctx.shadowBlur = 16;
             this.ctx.fillStyle = '#fbbf24';
             this.ctx.beginPath();
-            this.ctx.arc(bX, bY, 16, 0, Math.PI * 2);
+            this.ctx.arc(bX, bY, 18, 0, Math.PI * 2);
             this.ctx.fill();
 
-            this.ctx.font = '16px sans-serif';
+            this.ctx.font = 'bold 18px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText('🎁', bX, bY);
@@ -421,10 +434,14 @@ class MythicRacerRenderer {
             const iY = item.y || item.Y;
             const iType = item.itemType || item.ItemType;
 
-            this.ctx.font = '22px sans-serif';
+            this.ctx.save();
+            this.ctx.shadowColor = iType === 'banana' ? '#fde047' : '#ef4444';
+            this.ctx.shadowBlur = 10;
+            this.ctx.font = '24px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(iType === 'banana' ? '🍌' : '💣', iX, iY);
+            this.ctx.restore();
         });
 
         // 6. Draw Rockets 🚀
@@ -437,14 +454,16 @@ class MythicRacerRenderer {
             this.ctx.save();
             this.ctx.translate(rX, rY);
             this.ctx.rotate(rAngle);
-            this.ctx.font = '22px sans-serif';
+            this.ctx.shadowColor = '#ef4444';
+            this.ctx.shadowBlur = 12;
+            this.ctx.font = '24px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText('🚀', 0, 0);
             this.ctx.restore();
         });
 
-        // 7. Draw Cars 🏎️
+        // 7. Draw Cars 🏎️ (Detailed F1 Racing Car Graphics)
         const cars = this.state?.cars || this.state?.Cars || {};
         Object.values(cars).forEach(car => {
             const cX = car.x || car.X;
@@ -458,52 +477,91 @@ class MythicRacerRenderer {
             // Skid trail when moving fast
             if (Math.abs(car.speed || car.Speed || 0) > 4) {
                 this.skidMarks.push({ x: cX, y: cY });
-                if (this.skidMarks.length > 120) this.skidMarks.shift();
+                if (this.skidMarks.length > 150) this.skidMarks.shift();
             }
 
             this.ctx.save();
             this.ctx.translate(cX, cY);
             this.ctx.rotate(cAngle);
 
-            // Shield Aura
+            // Shield Energy Aura 🛡️
             if (isShielded) {
+                this.ctx.shadowColor = '#38bdf8';
+                this.ctx.shadowBlur = 16;
                 this.ctx.strokeStyle = '#38bdf8';
                 this.ctx.lineWidth = 4;
                 this.ctx.beginPath();
-                this.ctx.arc(0, 0, 26, 0, Math.PI * 2);
+                this.ctx.arc(0, 0, 28, 0, Math.PI * 2);
                 this.ctx.stroke();
             }
 
-            // Nitro Boost Flames ⚡
+            // Dual Nitro Flames ⚡
             if (nitroTimer > 0) {
                 this.ctx.fillStyle = '#f97316';
+                this.ctx.shadowColor = '#f97316';
+                this.ctx.shadowBlur = 14;
                 this.ctx.beginPath();
-                this.ctx.arc(-24, 0, 10, 0, Math.PI * 2);
+                this.ctx.moveTo(-20, -5);
+                this.ctx.lineTo(-34, 0);
+                this.ctx.lineTo(-20, 5);
+                this.ctx.closePath();
                 this.ctx.fill();
             }
 
-            // Car Chassis Body
-            this.ctx.fillStyle = cColor;
-            this.ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            this.ctx.shadowBlur = 8;
-            this.ctx.fillRect(-18, -10, 36, 20);
-
-            // Roof Windshield
+            // 4 Black Rubber Tires
             this.ctx.fillStyle = '#0f172a';
-            this.ctx.fillRect(-6, -7, 14, 14);
+            this.ctx.fillRect(10, -14, 10, 5);  // Front Right
+            this.ctx.fillRect(10, 9, 10, 5);   // Front Left
+            this.ctx.fillRect(-18, -14, 11, 6); // Rear Right
+            this.ctx.fillRect(-18, 8, 11, 6);  // Rear Left
 
-            // Headlights
+            // F1 Main Aerodynamic Body Chassis
+            this.ctx.fillStyle = cColor;
+            this.ctx.shadowColor = 'rgba(0,0,0,0.7)';
+            this.ctx.shadowBlur = 10;
+
+            // Front Nose Cone
+            this.ctx.beginPath();
+            this.ctx.moveTo(22, 0);
+            this.ctx.lineTo(8, -7);
+            this.ctx.lineTo(-16, -9);
+            this.ctx.lineTo(-18, 9);
+            this.ctx.lineTo(8, 7);
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            // Front Spoiler Wing
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillRect(18, -12, 4, 24);
+
+            // Rear Spoiler Wing
+            this.ctx.fillStyle = cColor;
+            this.ctx.fillRect(-22, -11, 5, 22);
+
+            // Cockpit & Driver Helmet 🏎️
+            this.ctx.fillStyle = '#020617';
+            this.ctx.fillRect(-4, -5, 12, 10);
+            this.ctx.fillStyle = '#f59e0b';
+            this.ctx.beginPath();
+            this.ctx.arc(2, 0, 4, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Headlights Glowing LED
             this.ctx.fillStyle = '#fef08a';
-            this.ctx.fillRect(16, -8, 4, 4);
-            this.ctx.fillRect(16, 4, 4, 4);
+            this.ctx.shadowColor = '#fef08a';
+            this.ctx.shadowBlur = 8;
+            this.ctx.fillRect(20, -6, 3, 3);
+            this.ctx.fillRect(20, 3, 3, 3);
 
             this.ctx.restore();
 
-            // Player Name Badge above car
+            // Player Name Badge & Rank Badge above car
             this.ctx.fillStyle = (pId === this.myPlayerId) ? '#fbbf24' : '#ffffff';
-            this.ctx.font = 'bold 12px sans-serif';
+            this.ctx.font = 'bold 13px sans-serif';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(car.playerName || car.PlayerName || 'Tay đua', cX, cY - 24);
+            this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            this.ctx.shadowBlur = 6;
+            this.ctx.fillText(car.playerName || car.PlayerName || 'Tay đua', cX, cY - 26);
         });
 
         // 8. Draw Countdown Banner 3.. 2.. 1.. GO!

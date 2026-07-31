@@ -64,7 +64,7 @@ public class MythicRacerEngine : IGameEngine
                 Speed = 0,
                 MaxSpeed = 8.5f,
                 CurrentLap = 1,
-                LastPassedCheckpoint = -1
+                LastPassedCheckpoint = 0
             };
 
             state.Cars[player.PlayerId] = car;
