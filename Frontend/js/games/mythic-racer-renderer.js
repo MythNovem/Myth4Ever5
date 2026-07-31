@@ -11,6 +11,7 @@ class MythicRacerRenderer {
         this.state = null;
         this.myPlayerId = '';
         this.isGameOverModalShown = false;
+        this.gameLoopTimer = null;
 
         // Input state
         this.inputs = {
@@ -64,6 +65,9 @@ class MythicRacerRenderer {
         const appContainer = document.getElementById('game-container');
         if (!appContainer) return;
 
+        const chatBar = document.querySelector('.chat-bar');
+        if (chatBar) chatBar.style.display = 'none';
+
         appContainer.innerHTML = `
             <div id="racer-container" style="width: 100%; height: 100vh; display: flex; flex-direction: column; background: #070510; color: #fff; overflow: hidden; position: absolute; inset: 0;">
                 <!-- TOP HEADER BAR -->
@@ -77,6 +81,7 @@ class MythicRacerRenderer {
                         <div id="racer-item-slot" style="background: rgba(255,255,255,0.08); border: 2px solid #fbbf24; border-radius: 12px; padding: 4px 16px; font-size: 20px; cursor: pointer;" title="Bấm SPACE để dùng vật phẩm">🎁 Trống</div>
                     </div>
                     <div style="display: flex; gap: 8px;">
+                        <button id="btn-racer-fullscreen" class="btn btn-ghost" style="font-size: 13px; color: #fbbf24; border-color: #fbbf24;">🖥️ Toàn Màn Hình</button>
                         <button id="btn-racer-leave" class="btn btn-ghost" style="font-size: 13px; color: #ef4444; border-color: #ef4444;">🚪 Rời Phòng</button>
                     </div>
                 </div>
@@ -128,8 +133,25 @@ class MythicRacerRenderer {
         window.addEventListener('keyup', this.boundKeyUp);
 
         this.bindEvents();
+        this.startLoopTimer();
         this.updateState(state);
-        this.draw();
+    }
+
+    startLoopTimer() {
+        if (this.gameLoopTimer) clearInterval(this.gameLoopTimer);
+
+        // 20Hz Tick loop (Every 50ms) to drive countdown & physics engine
+        this.gameLoopTimer = setInterval(() => {
+            if (window.signalRService) {
+                const isAnyInput = this.inputs.steerLeft || this.inputs.steerRight || this.inputs.accelerate || this.inputs.reverse;
+                const isCountdown = this.state?.isCountdown ?? this.state?.IsCountdown ?? false;
+                const isGameOver = this.state?.isGameOver ?? this.state?.IsGameOver ?? false;
+
+                if (!isGameOver && (isAnyInput || isCountdown)) {
+                    window.signalRService.sendGameAction(isAnyInput ? 'update_input' : 'tick', this.inputs);
+                }
+            }
+        }, 50);
     }
 
     updateState(state) {
@@ -198,6 +220,17 @@ class MythicRacerRenderer {
     }
 
     bindEvents() {
+        document.getElementById('btn-racer-fullscreen')?.addEventListener('click', () => {
+            const elem = document.getElementById('racer-container') || document.documentElement;
+            if (!document.fullscreenElement) {
+                if (elem.requestFullscreen) elem.requestFullscreen();
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+            setTimeout(() => this.onResize(), 100);
+        });
+
         document.getElementById('btn-racer-leave')?.addEventListener('click', async () => {
             if (confirm('🚪 Bạn có chắc chắn muốn Rời Phòng đua xe không?')) {
                 if (window.soundFX) window.soundFX.play('click');
@@ -280,12 +313,27 @@ class MythicRacerRenderer {
     draw() {
         if (!this.ctx || !this.canvas) return;
 
+        const canvasW = this.canvas.width;
+        const canvasH = this.canvas.height;
+
         // Clear Background (Grass green)
         this.ctx.fillStyle = '#143011';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillRect(0, 0, canvasW, canvasH);
 
         const track = this.state?.track || this.state?.Track;
         if (!track || !track.waypoints) return;
+
+        const trackW = track.canvasWidth || track.CanvasWidth || 1400;
+        const trackH = track.canvasHeight || track.CanvasHeight || 900;
+
+        // Dynamic aspect ratio scaling & centering (Fits 100% on any screen size)
+        const scale = Math.min(canvasW / trackW, canvasH / trackH);
+        const offsetX = (canvasW - trackW * scale) / 2;
+        const offsetY = (canvasH - trackH * scale) / 2;
+
+        this.ctx.save();
+        this.ctx.translate(offsetX, offsetY);
+        this.ctx.scale(scale, scale);
 
         const waypoints = track.waypoints || track.Waypoints || [];
         const trackWidth = track.trackWidth || track.TrackWidth || 110;
@@ -458,7 +506,25 @@ class MythicRacerRenderer {
             this.ctx.fillText(car.playerName || car.PlayerName || 'Tay đua', cX, cY - 24);
         });
 
-        // 8. Render Minimap
+        // 8. Draw Countdown Banner 3.. 2.. 1.. GO!
+        const isCountdown = this.state?.isCountdown ?? this.state?.IsCountdown ?? false;
+        const countdownTimer = Math.ceil(this.state?.countdownTimer ?? this.state?.CountdownTimer ?? 0);
+        if (isCountdown) {
+            this.ctx.save();
+            this.ctx.fillStyle = '#fbbf24';
+            this.ctx.font = 'bold 80px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            this.ctx.shadowBlur = 24;
+            const text = countdownTimer > 0 ? `${countdownTimer}` : '🟢 GÓC GA XUẤT PHÁT!';
+            this.ctx.fillText(text, trackW / 2, trackH / 2);
+            this.ctx.restore();
+        }
+
+        this.ctx.restore();
+
+        // 9. Render Minimap
         this.drawMinimap();
     }
 
@@ -510,6 +576,11 @@ class MythicRacerRenderer {
     showGameOverModal(state) {
         if (this.isGameOverModalShown) return;
         this.isGameOverModalShown = true;
+
+        if (this.gameLoopTimer) {
+            clearInterval(this.gameLoopTimer);
+            this.gameLoopTimer = null;
+        }
 
         if (window.soundFX) window.soundFX.play('defuse');
 
@@ -573,6 +644,11 @@ class MythicRacerRenderer {
         this.isGameOverModalShown = false;
         this.skidMarks = [];
 
+        if (this.gameLoopTimer) {
+            clearInterval(this.gameLoopTimer);
+            this.gameLoopTimer = null;
+        }
+
         window.removeEventListener('resize', this.boundResize);
         window.removeEventListener('keydown', this.boundKeyDown);
         window.removeEventListener('keyup', this.boundKeyUp);
@@ -581,6 +657,9 @@ class MythicRacerRenderer {
         if (reopenBtn) reopenBtn.remove();
         const popup = document.getElementById('racer-gameover-popup');
         if (popup) popup.remove();
+
+        const chatBar = document.querySelector('.chat-bar');
+        if (chatBar) chatBar.style.display = '';
 
         const appContainer = document.getElementById('game-container');
         if (appContainer) {

@@ -78,13 +78,13 @@ public static class TrackRegistry
                 new Vector2D(160, 550)
             },
 
-            // 4 Grid Start Positions (Staggered start)
+            // 4 Grid Start Positions (Staggered start pointing East along Main Straight)
             GridStartPositions = new List<CarSpawnPoint>
             {
-                new CarSpawnPoint { Position = new Vector2D(280, 730), Angle = 0 }, // Car 1 (Red)
-                new CarSpawnPoint { Position = new Vector2D(280, 770), Angle = 0 }, // Car 2 (Blue)
-                new CarSpawnPoint { Position = new Vector2D(220, 730), Angle = 0 }, // Car 3 (Green)
-                new CarSpawnPoint { Position = new Vector2D(220, 770), Angle = 0 }  // Car 4 (Yellow)
+                new CarSpawnPoint { Position = new Vector2D(270, 725), Angle = 0 }, // Car 1 (Red)
+                new CarSpawnPoint { Position = new Vector2D(270, 775), Angle = 0 }, // Car 2 (Blue)
+                new CarSpawnPoint { Position = new Vector2D(210, 725), Angle = 0 }, // Car 3 (Green)
+                new CarSpawnPoint { Position = new Vector2D(210, 775), Angle = 0 }  // Car 4 (Yellow)
             }
         };
 
