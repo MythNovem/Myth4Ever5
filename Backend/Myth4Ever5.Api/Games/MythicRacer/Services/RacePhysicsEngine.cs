@@ -146,15 +146,15 @@ public static class RacePhysicsEngine
                 }
             }
 
-            // Steering Angle (Snappy, agile handling)
-            if (car.SteerLeft) car.Angle -= 4.8f * deltaTime;
-            if (car.SteerRight) car.Angle += 4.8f * deltaTime;
+            // Steering Angle (Agile, sharp, and easy to control)
+            if (car.SteerLeft) car.Angle -= 4.0f * deltaTime;
+            if (car.SteerRight) car.Angle += 4.0f * deltaTime;
 
-            // Max Speed calculation (Base 17.0, Nitro 26.0, Slipstream Drafting +20%)
-            float maxSpeed = car.MaxSpeed > 0 ? car.MaxSpeed : 17.0f;
+            // Max Speed calculation (Base 12.5f, Nitro 18.5f, Slipstream Drafting +20%)
+            float maxSpeed = car.MaxSpeed > 0 ? car.MaxSpeed : 12.5f;
             if (car.NitroTimer > 0)
             {
-                maxSpeed = 26.0f; // Supersonic Nitro speed!
+                maxSpeed = 18.5f; // Balanced energetic Nitro speed!
             }
 
             // Slipstream Drafting Boost (Hút gió khi chạy sau xe đối thủ)
@@ -163,7 +163,7 @@ public static class RacePhysicsEngine
             {
                 if (otherId == playerId || otherCar.IsFinished) continue;
                 float dist = Distance(car.X, car.Y, otherCar.X, otherCar.Y);
-                if (dist > 30f && dist < 190f)
+                if (dist > 30f && dist < 170f)
                 {
                     // Check if driving behind opponent car angle
                     float angleToOpponent = MathF.Atan2(otherCar.Y - car.Y, otherCar.X - car.X);
@@ -178,7 +178,7 @@ public static class RacePhysicsEngine
 
             if (isDrafting && car.NitroTimer <= 0)
             {
-                maxSpeed *= 1.25f; // +25% Slipstream Drafting Speed Boost!
+                maxSpeed *= 1.20f; // +20% Slipstream Drafting Speed Boost!
             }
 
             bool offRoad = IsOffRoad(car.X, car.Y, track);
@@ -187,10 +187,10 @@ public static class RacePhysicsEngine
                 maxSpeed *= 0.55f; // Smooth 55% speed limit on grass
             }
 
-            // Fast Acceleration & Physics Motion
+            // Smooth & Responsive Acceleration
             if (car.Accelerate)
             {
-                car.Speed = MathF.Min(maxSpeed, car.Speed + 30f * deltaTime);
+                car.Speed = MathF.Min(maxSpeed, car.Speed + 22f * deltaTime);
             }
             else if (car.Reverse)
             {

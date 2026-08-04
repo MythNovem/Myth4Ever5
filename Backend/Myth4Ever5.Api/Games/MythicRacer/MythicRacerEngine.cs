@@ -64,7 +64,7 @@ public class MythicRacerEngine : IGameEngine
                 Y = spawnPoint.Position.Y,
                 Angle = spawnPoint.Angle,
                 Speed = 0,
-                MaxSpeed = 17.0f,
+                MaxSpeed = 12.5f,
                 CurrentLap = 1,
                 LastPassedCheckpoint = 0
             };

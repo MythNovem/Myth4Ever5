@@ -134,7 +134,17 @@ class MythicRacerRenderer {
 
         this.bindEvents();
         this.startLoopTimer();
+        this.startRenderLoop();
         this.updateState(state);
+    }
+
+    startRenderLoop() {
+        if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
+        const loop = () => {
+            this.draw();
+            this.animFrameId = requestAnimationFrame(loop);
+        };
+        this.animFrameId = requestAnimationFrame(loop);
     }
 
     startLoopTimer() {
@@ -164,7 +174,6 @@ class MythicRacerRenderer {
 
         this.updateHeaderUI();
         this.updateLogsUI();
-        this.draw();
 
         const isGameOver = state.isGameOver || state.IsGameOver;
         if (isGameOver && !this.isGameOverModalShown) {
@@ -431,7 +440,7 @@ class MythicRacerRenderer {
             this.ctx.fill();
         });
 
-        // 4. Draw Item Boxes 🎁
+        // 4. Draw Item Boxes 🎁 (High-performance rendering without shadowBlur)
         const itemBoxes = this.state?.itemBoxes || this.state?.ItemBoxes || [];
         itemBoxes.forEach(box => {
             const isActive = box.isActive ?? box.IsActive ?? true;
@@ -441,12 +450,15 @@ class MythicRacerRenderer {
             const bY = box.y || box.Y;
 
             this.ctx.save();
-            this.ctx.shadowColor = '#fbbf24';
-            this.ctx.shadowBlur = 16;
             this.ctx.fillStyle = '#fbbf24';
             this.ctx.beginPath();
             this.ctx.arc(bX, bY, 18, 0, Math.PI * 2);
             this.ctx.fill();
+
+            // Outer ring indicator
+            this.ctx.strokeStyle = '#fef08a';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
 
             this.ctx.font = 'bold 18px sans-serif';
             this.ctx.textAlign = 'center';
@@ -463,8 +475,6 @@ class MythicRacerRenderer {
             const iType = item.itemType || item.ItemType;
 
             this.ctx.save();
-            this.ctx.shadowColor = iType === 'banana' ? '#fde047' : '#ef4444';
-            this.ctx.shadowBlur = 10;
             this.ctx.font = '24px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
@@ -482,8 +492,6 @@ class MythicRacerRenderer {
             this.ctx.save();
             this.ctx.translate(rX, rY);
             this.ctx.rotate(rAngle);
-            this.ctx.shadowColor = '#ef4444';
-            this.ctx.shadowBlur = 12;
             this.ctx.font = '24px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
@@ -491,12 +499,32 @@ class MythicRacerRenderer {
             this.ctx.restore();
         });
 
-        // 7. Draw Cars 🏎️ (Detailed F1 Racing Car Graphics)
+        // 7. Draw Cars 🏎️ (Detailed F1 Racing Car Graphics with Smooth 60FPS Position Lerp)
         const cars = this.state?.cars || this.state?.Cars || {};
         Object.values(cars).forEach(car => {
-            const cX = car.x || car.X;
-            const cY = car.y || car.Y;
-            const cAngle = car.angle || car.Angle || 0;
+            const targetX = car.x || car.X || 0;
+            const targetY = car.y || car.Y || 0;
+            const targetAngle = car.angle || car.Angle || 0;
+
+            // Lerp Position Interpolation for buttery-smooth 60FPS motion
+            if (car._renderX === undefined) {
+                car._renderX = targetX;
+                car._renderY = targetY;
+                car._renderAngle = targetAngle;
+            } else {
+                car._renderX += (targetX - car._renderX) * 0.35;
+                car._renderY += (targetY - car._renderY) * 0.35;
+                
+                // Angle lerp
+                let diff = targetAngle - car._renderAngle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                car._renderAngle += diff * 0.35;
+            }
+
+            const cX = car._renderX;
+            const cY = car._renderY;
+            const cAngle = car._renderAngle;
             const cColor = car.color || car.Color || '#ef4444';
             const isShielded = car.isShielded || car.IsShielded;
             const nitroTimer = car.nitroTimer || car.NitroTimer || 0;
@@ -505,7 +533,7 @@ class MythicRacerRenderer {
             // Skid trail when moving fast
             if (Math.abs(car.speed || car.Speed || 0) > 4) {
                 this.skidMarks.push({ x: cX, y: cY });
-                if (this.skidMarks.length > 150) this.skidMarks.shift();
+                if (this.skidMarks.length > 120) this.skidMarks.shift();
             }
 
             this.ctx.save();
@@ -514,8 +542,6 @@ class MythicRacerRenderer {
 
             // Shield Energy Aura 🛡️
             if (isShielded) {
-                this.ctx.shadowColor = '#38bdf8';
-                this.ctx.shadowBlur = 16;
                 this.ctx.strokeStyle = '#38bdf8';
                 this.ctx.lineWidth = 4;
                 this.ctx.beginPath();
@@ -526,8 +552,6 @@ class MythicRacerRenderer {
             // Dual Nitro Flames ⚡
             if (nitroTimer > 0) {
                 this.ctx.fillStyle = '#f97316';
-                this.ctx.shadowColor = '#f97316';
-                this.ctx.shadowBlur = 14;
                 this.ctx.beginPath();
                 this.ctx.moveTo(-20, -5);
                 this.ctx.lineTo(-34, 0);
@@ -545,8 +569,6 @@ class MythicRacerRenderer {
 
             // F1 Main Aerodynamic Body Chassis
             this.ctx.fillStyle = cColor;
-            this.ctx.shadowColor = 'rgba(0,0,0,0.7)';
-            this.ctx.shadowBlur = 10;
 
             // Front Nose Cone
             this.ctx.beginPath();
@@ -576,8 +598,6 @@ class MythicRacerRenderer {
 
             // Headlights Glowing LED
             this.ctx.fillStyle = '#fef08a';
-            this.ctx.shadowColor = '#fef08a';
-            this.ctx.shadowBlur = 8;
             this.ctx.fillRect(20, -6, 3, 3);
             this.ctx.fillRect(20, 3, 3, 3);
 
@@ -587,8 +607,6 @@ class MythicRacerRenderer {
             this.ctx.fillStyle = (pId === this.myPlayerId) ? '#fbbf24' : '#ffffff';
             this.ctx.font = 'bold 13px sans-serif';
             this.ctx.textAlign = 'center';
-            this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
-            this.ctx.shadowBlur = 6;
             this.ctx.fillText(car.playerName || car.PlayerName || 'Tay đua', cX, cY - 26);
 
             // Reaction Badge overlay
