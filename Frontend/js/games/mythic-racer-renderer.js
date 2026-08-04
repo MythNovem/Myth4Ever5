@@ -92,9 +92,6 @@ class MythicRacerRenderer {
                     <div class="canvas-wrapper" style="flex: 1; position: relative; background: #0b1509;">
                         <canvas id="racer-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
 
-                        <!-- MINIMAP OVERLAY -->
-                        <canvas id="racer-minimap" width="220" height="140" style="position: absolute; top: 16px; right: 16px; background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(239, 68, 68, 0.4); border-radius: 12px; backdrop-filter: blur(8px); z-index: 20;"></canvas>
-
                         <!-- TOUCH CONTROLS FOR MOBILE -->
                         <div id="racer-touch-controls" style="position: absolute; bottom: 20px; left: 20px; right: 20px; display: flex; justify-content: space-between; pointer-events: none; z-index: 30;">
                             <div style="display: flex; gap: 12px; pointer-events: auto;">
@@ -109,10 +106,13 @@ class MythicRacerRenderer {
                         </div>
                     </div>
 
-                    <!-- RIGHT LOGS PANEL -->
-                    <div class="racer-logs-panel glass-card" style="width: 250px; background: rgba(23, 20, 41, 0.85); backdrop-filter: blur(10px); border-left: 1px solid rgba(239, 68, 68, 0.2); padding: 16px; display: flex; flex-direction: column; gap: 12px; z-index: 10;">
-                        <h3 style="font-size: 14px; color: #ef4444; margin: 0;">📜 Nhật Ký Đuổi Bắt</h3>
-                        <div id="racer-logs" style="flex: 1; overflow-y: auto; font-size: 12px; color: #fca5a5; display: flex; flex-direction: column; gap: 6px;"></div>
+                    <!-- RIGHT LOGS & MINIMAP PANEL -->
+                    <div class="racer-logs-panel glass-card" style="width: 230px; background: rgba(23, 20, 41, 0.85); backdrop-filter: blur(10px); border-left: 1px solid rgba(239, 68, 68, 0.2); padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 10;">
+                        <div style="font-size: 13px; font-weight: 700; color: #ef4444;">🗺️ Bản Đồ Thu Nhỏ</div>
+                        <canvas id="racer-minimap" width="206" height="130" style="width: 100%; height: 130px; background: rgba(15, 23, 42, 0.9); border: 2px solid rgba(239, 68, 68, 0.4); border-radius: 10px;"></canvas>
+                        
+                        <h3 style="font-size: 13px; color: #ef4444; margin: 4px 0 0 0;">📜 Nhật Ký Đuổi Bắt</h3>
+                        <div id="racer-logs" style="flex: 1; overflow-y: auto; font-size: 11px; color: #fca5a5; display: flex; flex-direction: column; gap: 4px;"></div>
                     </div>
                 </div>
             </div>
@@ -185,7 +185,25 @@ class MythicRacerRenderer {
             const totalLaps = this.state?.totalLaps || this.state?.TotalLaps || 3;
             if (lapBadge) lapBadge.textContent = `LAP ${Math.min(lap, totalLaps)}/${totalLaps}`;
 
+            if (this.lastLap !== undefined && lap > this.lastLap) {
+                if (window.soundFX) window.soundFX.play('lap');
+            }
+            this.lastLap = lap;
+
             const item = myCar.currentItem || myCar.CurrentItem;
+            if (!this.lastItem && item) {
+                if (window.soundFX) window.soundFX.play('item');
+            }
+            this.lastItem = item;
+
+            const spinout = myCar.spinoutTimer || myCar.SpinoutTimer || 0;
+            if (spinout > 0 && !this.isSpinning) {
+                if (window.soundFX) window.soundFX.play('spin');
+                this.isSpinning = true;
+            } else if (spinout <= 0) {
+                this.isSpinning = false;
+            }
+
             const itemIcons = {
                 nitro: '⚡ Nitro',
                 shield: '🛡️ Khiên',
@@ -294,7 +312,17 @@ class MythicRacerRenderer {
     }
 
     triggerUseItem() {
-        if (window.soundFX) window.soundFX.play('play');
+        const cars = this.state?.cars || this.state?.Cars || {};
+        const myCar = cars[this.myPlayerId];
+        const item = myCar?.currentItem || myCar?.CurrentItem;
+
+        if (window.soundFX && item) {
+            if (item === 'nitro') window.soundFX.play('nitro');
+            else if (item === 'rocket') window.soundFX.play('rocket');
+            else if (item === 'bomb') window.soundFX.play('explosion');
+            else window.soundFX.play('play');
+        }
+
         if (window.signalRService) {
             window.signalRService.sendGameAction('use_item', {});
         }
@@ -336,9 +364,9 @@ class MythicRacerRenderer {
         this.ctx.scale(scale, scale);
 
         const waypoints = track.waypoints || track.Waypoints || [];
-        const trackWidth = track.trackWidth || track.TrackWidth || 95;
+        const trackWidth = track.trackWidth || track.TrackWidth || 150;
 
-        // 1. Draw F1 Night Track Road
+        // 1. Draw 3-Lane F1 Highway Track Road
         this.ctx.save();
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
@@ -351,7 +379,7 @@ class MythicRacerRenderer {
         });
         this.ctx.closePath();
         this.ctx.strokeStyle = '#dc2626';
-        this.ctx.lineWidth = trackWidth + 14;
+        this.ctx.lineWidth = trackWidth + 16;
         this.ctx.stroke();
 
         // Asphalt Road Base (Dark Slate Gray)
@@ -360,17 +388,17 @@ class MythicRacerRenderer {
         this.ctx.stroke();
 
         // Glowing Yellow Edge Side Lines
-        this.ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+        this.ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
         this.ctx.lineWidth = trackWidth - 4;
         this.ctx.stroke();
 
         // Inner Asphalt Core
         this.ctx.strokeStyle = '#151c28';
-        this.ctx.lineWidth = trackWidth - 10;
+        this.ctx.lineWidth = trackWidth - 12;
         this.ctx.stroke();
 
-        // White Center Dashline
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        // 3-Lane White Dashed Divider Line
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([16, 16]);
         this.ctx.stroke();
@@ -555,28 +583,82 @@ class MythicRacerRenderer {
 
             this.ctx.restore();
 
-            // Player Name Badge & Rank Badge above car
+            // Player Name Badge & Reaction Badges above car
             this.ctx.fillStyle = (pId === this.myPlayerId) ? '#fbbf24' : '#ffffff';
             this.ctx.font = 'bold 13px sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
             this.ctx.shadowBlur = 6;
             this.ctx.fillText(car.playerName || car.PlayerName || 'Tay đua', cX, cY - 26);
+
+            // Reaction Badge overlay
+            const rxMs = car.launchReactionMs ?? car.LaunchReactionMs ?? -1;
+            const isRocket = car.isRocketLaunch ?? car.IsRocketLaunch;
+            const isJump = car.isJumpStart ?? car.IsJumpStart;
+
+            if (isJump) {
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.font = 'bold 12px sans-serif';
+                this.ctx.fillText('⚠️ CƯỚP CỜ!', cX, cY - 42);
+            } else if (isRocket) {
+                this.ctx.fillStyle = '#f59e0b';
+                this.ctx.font = 'bold 12px sans-serif';
+                this.ctx.fillText(`⚡ THẦN TỐC (${rxMs}ms)!`, cX, cY - 42);
+            } else if (rxMs > 0) {
+                this.ctx.fillStyle = '#38bdf8';
+                this.ctx.font = 'bold 12px sans-serif';
+                this.ctx.fillText(`${rxMs}ms`, cX, cY - 42);
+            }
         });
 
-        // 8. Draw Countdown Banner 3.. 2.. 1.. GO!
+        // 8. Draw F1 5-Red Light Gantry Overlay
         const isCountdown = this.state?.isCountdown ?? this.state?.IsCountdown ?? false;
-        const countdownTimer = Math.ceil(this.state?.countdownTimer ?? this.state?.CountdownTimer ?? 0);
+        const redLightsCount = this.state?.redLightsCount ?? this.state?.RedLightsCount ?? 0;
+
         if (isCountdown) {
             this.ctx.save();
+
+            // Gantry Housing Frame
+            const gX = trackW / 2;
+            const gY = 180;
+            this.ctx.fillStyle = '#0f172a';
+            this.ctx.strokeStyle = '#ef4444';
+            this.ctx.lineWidth = 3;
+            this.ctx.fillRect(gX - 220, gY - 45, 440, 90);
+            this.ctx.strokeRect(gX - 220, gY - 45, 440, 90);
+
+            // 5 Light Pods
+            for (let i = 1; i <= 5; i++) {
+                const pX = gX - 180 + (i - 1) * 90;
+                const isOn = redLightsCount >= i;
+
+                this.ctx.fillStyle = isOn ? '#ef4444' : '#334155';
+                if (isOn) {
+                    this.ctx.shadowColor = '#ef4444';
+                    this.ctx.shadowBlur = 24;
+                } else {
+                    this.ctx.shadowBlur = 0;
+                }
+
+                this.ctx.beginPath();
+                this.ctx.arc(pX, gY, 28, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                if (isOn) {
+                    this.ctx.fillStyle = '#fca5a5';
+                    this.ctx.beginPath();
+                    this.ctx.arc(pX - 6, gY - 6, 8, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+
             this.ctx.fillStyle = '#fbbf24';
-            this.ctx.font = 'bold 80px sans-serif';
+            this.ctx.font = 'bold 20px sans-serif';
             this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
             this.ctx.shadowColor = 'rgba(0,0,0,0.9)';
-            this.ctx.shadowBlur = 24;
-            const text = countdownTimer > 0 ? `${countdownTimer}` : '🟢 GÓC GA XUẤT PHÁT!';
-            this.ctx.fillText(text, trackW / 2, trackH / 2);
+            this.ctx.shadowBlur = 10;
+            this.ctx.fillText('🚦 CHUẨN BỊ XUẤT PHÁT! NHẤN GA KHI ĐÈN ĐỎ TẮT!', gX, gY + 80);
+
             this.ctx.restore();
         }
 

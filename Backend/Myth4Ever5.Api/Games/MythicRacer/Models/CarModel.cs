@@ -33,4 +33,9 @@ public class CarModel
     public float NitroTimer { get; set; } = 0;
     public float SpinoutTimer { get; set; } = 0; // Spinning 360 deg when hit banana
     public float HitStunTimer { get; set; } = 0; // Knocked back when hit by rocket
+
+    // F1 Reaction Launch
+    public int LaunchReactionMs { get; set; } = -1; // Reaction time in ms (-1 if not launched yet)
+    public bool IsRocketLaunch { get; set; } = false; // Perfect launch bonus (< 250ms)
+    public bool IsJumpStart { get; set; } = false; // Penalty for accelerating early
 }

@@ -12,7 +12,10 @@ public class MythicRacerState
 
     public int TotalLaps { get; set; } = 3;
     public bool IsCountdown { get; set; } = true;
-    public float CountdownTimer { get; set; } = 3.0f; // 3.. 2.. 1.. GO!
+    public float CountdownTimer { get; set; } = 5.0f; // 5.. 4.. 3.. 2.. 1.. GO!
+    public int RedLightsCount { get; set; } = 0; // 0 to 5 red lights ON
+    public float RandomLaunchDelay { get; set; } = 1.2f; // Random delay before lights out
+    public DateTime? LightsOutTime { get; set; }
 
     public bool IsGameOver { get; set; } = false;
     public string? WinnerPlayerId { get; set; }

@@ -8,14 +8,36 @@ public static class RacePhysicsEngine
     {
         if (state.IsGameOver) return;
 
-        // 1. Countdown state
+        // 1. F1 5-Red Light Countdown state
         if (state.IsCountdown)
         {
             state.CountdownTimer -= deltaTime;
-            if (state.CountdownTimer <= 0)
+
+            // Update 5-Red Light Sequence
+            if (state.CountdownTimer > 4.0f) state.RedLightsCount = 1;
+            else if (state.CountdownTimer > 3.2f) state.RedLightsCount = 2;
+            else if (state.CountdownTimer > 2.4f) state.RedLightsCount = 3;
+            else if (state.CountdownTimer > 1.6f) state.RedLightsCount = 4;
+            else if (state.CountdownTimer > 0.8f) state.RedLightsCount = 5;
+
+            // Check Jumpstarts during countdown
+            foreach (var (pId, car) in state.Cars)
+            {
+                if (car.Accelerate && !car.IsJumpStart)
+                {
+                    car.IsJumpStart = true;
+                    car.HitStunTimer = 1.5f;
+                    state.RaceLogs.Add($"⚠️ {car.PlayerName} CƯỚP CỜ! Động cơ bị khựng 1.5s!");
+                }
+            }
+
+            // Random delay after 5th light before LIGHTS OUT
+            if (state.CountdownTimer <= (0.8f - state.RandomLaunchDelay))
             {
                 state.IsCountdown = false;
-                state.CountdownTimer = 0;
+                state.RedLightsCount = 0;
+                state.LightsOutTime = DateTime.UtcNow;
+                state.RaceLogs.Add("🟢 LIGHTS OUT & AWAY WE GO! ĐÈN TẮT - XUẤT PHÁT!");
             }
             return;
         }
@@ -101,43 +123,82 @@ public static class RacePhysicsEngine
                 continue;
             }
 
-            if (car.HitStunTimer > 0)
+            // Precision Reaction Launch Evaluation right after Lights Out
+            if (car.Accelerate && car.LaunchReactionMs == -1 && state.LightsOutTime.HasValue)
             {
-                car.HitStunTimer -= deltaTime;
-                car.Speed = 0;
-                continue;
+                int reactionMs = (int)(DateTime.UtcNow - state.LightsOutTime.Value).TotalMilliseconds;
+                car.LaunchReactionMs = reactionMs;
+
+                if (reactionMs <= 250 && !car.IsJumpStart)
+                {
+                    car.IsRocketLaunch = true;
+                    car.NitroTimer = 3.0f; // 3 seconds Nitro Boost!
+                    car.Speed = 6.0f;
+                    state.RaceLogs.Add($"⚡ {car.PlayerName} xuất phát THẦN TỐC ({reactionMs}ms)! Tăng tốc ROCKET LAUNCH!");
+                }
+                else if (reactionMs <= 450)
+                {
+                    state.RaceLogs.Add($"🏎️ {car.PlayerName} phản xạ xuất phát tốt ({reactionMs}ms)!");
+                }
+                else
+                {
+                    state.RaceLogs.Add($"🐢 {car.PlayerName} phản xạ xuất phát trễ ({reactionMs}ms)!");
+                }
             }
 
-            // Steering Angle
-            if (car.SteerLeft) car.Angle -= 3.2f * deltaTime;
-            if (car.SteerRight) car.Angle += 3.2f * deltaTime;
+            // Steering Angle (Snappy, agile handling)
+            if (car.SteerLeft) car.Angle -= 4.8f * deltaTime;
+            if (car.SteerRight) car.Angle += 4.8f * deltaTime;
 
-            // Max Speed calculation (Nitro / Grass Off-road)
-            float maxSpeed = car.MaxSpeed;
+            // Max Speed calculation (Base 17.0, Nitro 26.0, Slipstream Drafting +20%)
+            float maxSpeed = car.MaxSpeed > 0 ? car.MaxSpeed : 17.0f;
             if (car.NitroTimer > 0)
             {
-                maxSpeed = 14.0f; // Nitro speed!
+                maxSpeed = 26.0f; // Supersonic Nitro speed!
+            }
+
+            // Slipstream Drafting Boost (Hút gió khi chạy sau xe đối thủ)
+            bool isDrafting = false;
+            foreach (var (otherId, otherCar) in state.Cars)
+            {
+                if (otherId == playerId || otherCar.IsFinished) continue;
+                float dist = Distance(car.X, car.Y, otherCar.X, otherCar.Y);
+                if (dist > 30f && dist < 190f)
+                {
+                    // Check if driving behind opponent car angle
+                    float angleToOpponent = MathF.Atan2(otherCar.Y - car.Y, otherCar.X - car.X);
+                    float angleDiff = MathF.Abs(car.Angle - angleToOpponent);
+                    if (angleDiff < 0.6f || angleDiff > (MathF.PI * 2f - 0.6f))
+                    {
+                        isDrafting = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isDrafting && car.NitroTimer <= 0)
+            {
+                maxSpeed *= 1.25f; // +25% Slipstream Drafting Speed Boost!
             }
 
             bool offRoad = IsOffRoad(car.X, car.Y, track);
             if (offRoad && car.NitroTimer <= 0)
             {
-                maxSpeed *= 0.20f; // Stricter 80% speed penalty on grass!
-                car.Speed *= 0.88f; // Immediate friction deceleration on off-road
+                maxSpeed *= 0.55f; // Smooth 55% speed limit on grass
             }
 
-            // Acceleration & Friction
+            // Fast Acceleration & Physics Motion
             if (car.Accelerate)
             {
-                car.Speed = MathF.Min(maxSpeed, car.Speed + 14f * deltaTime);
+                car.Speed = MathF.Min(maxSpeed, car.Speed + 30f * deltaTime);
             }
             else if (car.Reverse)
             {
-                car.Speed = MathF.Max(-3.5f, car.Speed - 8f * deltaTime);
+                car.Speed = MathF.Max(-5.0f, car.Speed - 12f * deltaTime);
             }
             else
             {
-                car.Speed *= MathF.Pow(0.82f, deltaTime * 60f); // Friction
+                car.Speed *= MathF.Pow(0.85f, deltaTime * 60f); // Friction
             }
 
             // Move Car Position
@@ -148,15 +209,15 @@ public static class RacePhysicsEngine
             car.X = Math.Clamp(car.X, 30, track.CanvasWidth - 30);
             car.Y = Math.Clamp(car.Y, 30, track.CanvasHeight - 30);
 
-            // Item Box Collision
+            // Item Box Collision (Faster 2.5s Respawn)
             if (string.IsNullOrEmpty(car.CurrentItem))
             {
                 foreach (var box in state.ItemBoxes)
                 {
-                    if (box.IsActive && Distance(car.X, car.Y, box.X, box.Y) < 38f)
+                    if (box.IsActive && Distance(car.X, car.Y, box.X, box.Y) < 42f)
                     {
                         box.IsActive = false;
-                        box.RespawnTimer = 5.0f;
+                        box.RespawnTimer = 2.5f; // Fast respawn for continuous action
                         car.CurrentItem = GetRandomItem();
                         state.RaceLogs.Add($"🎁 {car.PlayerName} nhặt được {GetItemDisplayName(car.CurrentItem)}!");
                         break;
@@ -321,7 +382,8 @@ public static class RacePhysicsEngine
             if (distSq < minDistanceSq) minDistanceSq = distSq;
         }
 
-        float halfWidth = track.TrackWidth / 2f;
+        // Add 25px tolerance buffer for smooth cornering on asphalt
+        float halfWidth = (track.TrackWidth / 2f) + 25f;
         return minDistanceSq > (halfWidth * halfWidth);
     }
 

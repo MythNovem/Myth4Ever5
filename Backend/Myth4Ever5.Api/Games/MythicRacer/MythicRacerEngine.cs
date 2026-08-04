@@ -30,7 +30,9 @@ public class MythicRacerEngine : IGameEngine
             Track = track,
             TotalLaps = 3,
             IsCountdown = true,
-            CountdownTimer = 3.0f,
+            CountdownTimer = 5.0f,
+            RedLightsCount = 0,
+            RandomLaunchDelay = (float)(0.6 + new Random().NextDouble() * 1.8),
             IsGameOver = false
         };
 
@@ -62,7 +64,7 @@ public class MythicRacerEngine : IGameEngine
                 Y = spawnPoint.Position.Y,
                 Angle = spawnPoint.Angle,
                 Speed = 0,
-                MaxSpeed = 8.5f,
+                MaxSpeed = 17.0f,
                 CurrentLap = 1,
                 LastPassedCheckpoint = 0
             };

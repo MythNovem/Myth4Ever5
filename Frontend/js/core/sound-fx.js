@@ -74,8 +74,8 @@ class SoundFX {
                 break;
 
             case 'explosion':
-                // Noise generator for explosion
-                const bufferSize = this.ctx.sampleRate * 1.0;
+                // Soft lowpass thud generator for explosion
+                const bufferSize = this.ctx.sampleRate * 0.3;
                 const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = buffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) {
@@ -86,17 +86,70 @@ class SoundFX {
                 
                 const noiseFilter = this.ctx.createBiquadFilter();
                 noiseFilter.type = 'lowpass';
-                noiseFilter.frequency.setValueAtTime(1000, time);
-                noiseFilter.frequency.exponentialRampToValueAtTime(100, time + 0.8);
+                noiseFilter.frequency.setValueAtTime(350, time);
+                noiseFilter.frequency.exponentialRampToValueAtTime(60, time + 0.3);
 
                 noise.connect(noiseFilter);
                 noiseFilter.connect(gain);
                 
-                gain.gain.setValueAtTime(1, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.8);
+                gain.gain.setValueAtTime(0.15, time);
+                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
                 
                 noise.start(time);
-                noise.stop(time + 0.8);
+                noise.stop(time + 0.3);
+                break;
+            case 'nitro':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, time);
+                osc.frequency.exponentialRampToValueAtTime(1200, time + 0.4);
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.linearRampToValueAtTime(0, time + 0.4);
+                osc.start(time);
+                osc.stop(time + 0.4);
+                break;
+
+            case 'item':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, time); // C5
+                osc.frequency.setValueAtTime(659.25, time + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, time + 0.16); // G5
+                osc.frequency.setValueAtTime(1046.50, time + 0.24); // C6
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(0.3, time + 0.05);
+                gain.gain.linearRampToValueAtTime(0, time + 0.35);
+                osc.start(time);
+                osc.stop(time + 0.35);
+                break;
+
+            case 'spin':
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, time);
+                osc.frequency.linearRampToValueAtTime(200, time + 0.3);
+                gain.gain.setValueAtTime(0.3, time);
+                gain.gain.linearRampToValueAtTime(0, time + 0.3);
+                osc.start(time);
+                osc.stop(time + 0.3);
+                break;
+
+            case 'rocket':
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(200, time);
+                osc.frequency.exponentialRampToValueAtTime(800, time + 0.3);
+                gain.gain.setValueAtTime(0.4, time);
+                gain.gain.linearRampToValueAtTime(0, time + 0.3);
+                osc.start(time);
+                osc.stop(time + 0.3);
+                break;
+
+            case 'lap':
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, time);
+                osc.frequency.setValueAtTime(900, time + 0.12);
+                osc.frequency.setValueAtTime(1200, time + 0.24);
+                gain.gain.setValueAtTime(0.4, time);
+                gain.gain.linearRampToValueAtTime(0, time + 0.4);
+                osc.start(time);
+                osc.stop(time + 0.4);
                 break;
         }
     }
